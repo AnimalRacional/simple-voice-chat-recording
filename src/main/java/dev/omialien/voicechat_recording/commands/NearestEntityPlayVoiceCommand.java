@@ -1,7 +1,7 @@
 package dev.omialien.voicechat_recording.commands;
 
 import dev.omialien.voicechat_recording.RecordingSimpleVoiceChat;
-import dev.omialien.voicechat_recording.voicechat.RevervoxVoicechatPlugin;
+import dev.omialien.voicechat_recording.voicechat.RecordingSimpleVoiceChatPlugin;
 import dev.omialien.voicechat_recording.voicechat.audio.AudioPlayer;
 import com.mojang.authlib.GameProfile;
 import com.mojang.brigadier.CommandDispatcher;
@@ -103,9 +103,9 @@ public class NearestEntityPlayVoiceCommand {
         RecordingSimpleVoiceChat.LOGGER.debug("Entity: " + entity.getName());
         for (GameProfile player : players) {
             UUID channelID = UUID.randomUUID();
-            EntityAudioChannel channel = createChannel(api, channelID, RevervoxVoicechatPlugin.REVERVOX_CATEGORY, entity);
+            EntityAudioChannel channel = createChannel(api, channelID, RecordingSimpleVoiceChatPlugin.REVERVOX_CATEGORY, entity);
             RecordingSimpleVoiceChat.LOGGER.debug("Created new channel: " + channel);
-            short[] audio = RevervoxVoicechatPlugin.getAudio(player.getId(), index, remove);
+            short[] audio = RecordingSimpleVoiceChatPlugin.getAudio(player.getId(), index, remove);
             if(audio != null){
                 ctx.getSource().sendSuccess(() ->
                         Component.literal("Playing audio from " + player.getName() + " index " + index + " from " + entity.getName()), true);

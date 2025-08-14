@@ -1,6 +1,6 @@
 package dev.omialien.voicechat_recording.commands;
 
-import dev.omialien.voicechat_recording.voicechat.RevervoxVoicechatPlugin;
+import dev.omialien.voicechat_recording.voicechat.RecordingSimpleVoiceChatPlugin;
 import com.mojang.brigadier.CommandDispatcher;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
@@ -14,7 +14,7 @@ public class StopRecordingCommand {
 
             Player player = cmdSrc.getSource().getPlayerOrException();
 
-            RevervoxVoicechatPlugin.stopRecording(player.getUUID());
+            RecordingSimpleVoiceChatPlugin.stopRecording(player.getUUID());
 
             cmdSrc.getSource().sendSuccess(() -> Component.literal("Stopped Recording for " + player.getGameProfile().getName() + "..."), false);
 

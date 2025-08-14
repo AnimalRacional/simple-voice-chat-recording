@@ -1,7 +1,7 @@
 package dev.omialien.voicechat_recording.commands;
 
 import com.mojang.brigadier.CommandDispatcher;
-import dev.omialien.voicechat_recording.voicechat.RevervoxVoicechatPlugin;
+import dev.omialien.voicechat_recording.voicechat.RecordingSimpleVoiceChatPlugin;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.Component;
@@ -13,7 +13,7 @@ public class StartRecordingCommand {
         dispatcher.register(Commands.literal("startRecording").requires((cmdSrc) -> cmdSrc.hasPermission(PERMISSION_LEVEL)).executes((cmdSrc) -> {
             Player player = cmdSrc.getSource().getPlayerOrException();
 
-            RevervoxVoicechatPlugin.startRecording(player.getUUID());
+            RecordingSimpleVoiceChatPlugin.startRecording(player.getUUID());
 
             cmdSrc.getSource().sendSuccess(() -> Component.literal("Started Recording for " + player.getGameProfile().getName() + "..."), false);
 

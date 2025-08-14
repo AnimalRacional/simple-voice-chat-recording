@@ -9,7 +9,7 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 @ForgeVoicechatPlugin
-public class RevervoxVoicechatPlugin implements VoicechatPlugin {
+public class RecordingSimpleVoiceChatPlugin implements VoicechatPlugin {
     public static final int SAMPLE_RATE = 48000;
     public static String REVERVOX_CATEGORY = "revervox";
     private static Map<UUID, RecordedPlayer> recordedPlayers;
@@ -157,11 +157,11 @@ public class RevervoxVoicechatPlugin implements VoicechatPlugin {
 
     private Runnable checkForSilence() {
         return () -> {
-            for (RecordedPlayer player : RevervoxVoicechatPlugin.getRecordedPlayers().values()) {
+            for (RecordedPlayer player : RecordingSimpleVoiceChatPlugin.getRecordedPlayers().values()) {
                 if(player.isSpeaking()) continue;
                 if (player.isSilent()) continue;
                 RecordingSimpleVoiceChat.LOGGER.debug("Stopped Speaking!");
-                RevervoxVoicechatPlugin.stopRecording(player.getUuid());
+                RecordingSimpleVoiceChatPlugin.stopRecording(player.getUuid());
                 player.setSilent(true);
             }
             RecordingSimpleVoiceChat.TASKS.schedule(checkForSilence(), 25);

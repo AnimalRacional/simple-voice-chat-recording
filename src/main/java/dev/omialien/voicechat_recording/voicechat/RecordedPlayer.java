@@ -43,7 +43,7 @@ public class RecordedPlayer {
             RecordingSimpleVoiceChat.LOGGER.debug("userpath exists");
             // TODO if a player records 200 audios alone, leaves, and then joins back later after other players started recording their own audios, all the audios will be added, leading to all audios in the server belonging to the same player
             (new AudioDirectoryReader(userPath, true,
-                    (audio) -> RevervoxVoicechatPlugin.addAudio(uuid, audio),
+                    (audio) -> RecordingSimpleVoiceChatPlugin.addAudio(uuid, audio),
                     (path) -> {
                         String filename = path.getFileName().toString();
                         RecordingSimpleVoiceChat.LOGGER.debug("Reading {} {}/{} ({})", filename, filename.startsWith("audio-"), filename.endsWith(".pcm"), path);
@@ -54,7 +54,7 @@ public class RecordedPlayer {
 
     private boolean savingaudios = false;
     public void saveAudios(){
-        if(!RevervoxVoicechatPlugin.getPrivacy(uuid) && !savingaudios){ // This method should only ever happen once per RecordedPlayer, no more no less
+        if(!RecordingSimpleVoiceChatPlugin.getPrivacy(uuid) && !savingaudios){ // This method should only ever happen once per RecordedPlayer, no more no less
             savingaudios = true;
             Path userPath = audiosPath.resolve(this.uuid.toString());
             try{
@@ -92,7 +92,7 @@ public class RecordedPlayer {
             if (filterAudio()){
                 short[] savedRecording = new short[recordingSize];
                 System.arraycopy(recording, 0, savedRecording, 0, recordingSize);
-                RevervoxVoicechatPlugin.addAudio(uuid, savedRecording);
+                RecordingSimpleVoiceChatPlugin.addAudio(uuid, savedRecording);
                 RecordingSimpleVoiceChat.LOGGER.debug("Added audio to MEMORY for player: " + uuid.toString());
             } else {
                 RecordingSimpleVoiceChat.LOGGER.debug("Audio filtered, not storing");
@@ -149,7 +149,7 @@ public class RecordedPlayer {
         if(idx < 0 || idx >= recordedAudios.size()){
             return null;
         }
-        if(remove && RevervoxVoicechatPlugin.getAudioCount() > RecordingServerConfig.MINIMUM_AUDIO_COUNT.get()){
+        if(remove && RecordingSimpleVoiceChatPlugin.getAudioCount() > RecordingServerConfig.MINIMUM_AUDIO_COUNT.get()){
             RecordingSimpleVoiceChat.LOGGER.debug("removing audio {}", idx);
             short[] audio = removeAudio(idx);
             RecordingSimpleVoiceChat.LOGGER.debug("REMOVING audio {}: {}", idx, audio.length);
