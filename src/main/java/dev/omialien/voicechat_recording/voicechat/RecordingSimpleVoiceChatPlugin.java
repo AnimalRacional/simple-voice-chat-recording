@@ -11,9 +11,9 @@ import java.util.concurrent.ConcurrentHashMap;
 @ForgeVoicechatPlugin
 public class RecordingSimpleVoiceChatPlugin implements VoicechatPlugin {
     public static final int SAMPLE_RATE = 48000;
-    public static String REVERVOX_CATEGORY = "revervox";
     private static Map<UUID, RecordedPlayer> recordedPlayers;
     private static Map<UUID, Boolean> privacyMode;
+    private static Queue<VolumeCategory> categories;
 
     /**
      * @return the unique ID for this voice chat plugin
@@ -32,6 +32,7 @@ public class RecordingSimpleVoiceChatPlugin implements VoicechatPlugin {
     public void initialize(VoicechatApi api) {
         RecordingSimpleVoiceChat.LOGGER.debug("Revervox voice chat plugin initialized!");
         RecordingSimpleVoiceChat.vcApi = api;
+        categories = new LinkedList<>();
     }
 
     /**
@@ -62,6 +63,15 @@ public class RecordingSimpleVoiceChatPlugin implements VoicechatPlugin {
         startRecording(playerUuid);
     }
 
+    public static void addCategory(String id, String name, String description, int[][] icon, VoicechatServerApi api){
+            categories.add(api.volumeCategoryBuilder()
+                .setId(id)
+                .setName(name)
+                .setDescription(description)
+                .setIcon(icon)
+                .build());
+    }
+
     private void onPlayerDisconnected(PlayerDisconnectedEvent e){
         stopRecording(e.getPlayerUuid());
         recordedPlayers.get(e.getPlayerUuid()).saveAudios();
@@ -71,14 +81,11 @@ public class RecordingSimpleVoiceChatPlugin implements VoicechatPlugin {
 
     private void onServerStarted(VoicechatServerStartedEvent event) {
         VoicechatServerApi api = event.getVoicechat();
-        VolumeCategory revervoxCategory = api.volumeCategoryBuilder()
-                .setId(REVERVOX_CATEGORY)
-                .setName("Revervox")
-                .setDescription("The volume of all monsters")
-                .setIcon(null)
-                .build();
 
-        api.registerVolumeCategory(revervoxCategory);
+        for(VolumeCategory cat : categories){
+            api.registerVolumeCategory(cat);
+        }
+
         recordedPlayers = new ConcurrentHashMap<>();
         privacyMode = new ConcurrentHashMap<>();
         RecordingSimpleVoiceChat.LOGGER.debug("STARTING SCHEDULER");

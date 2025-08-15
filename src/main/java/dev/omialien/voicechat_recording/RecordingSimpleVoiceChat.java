@@ -2,10 +2,12 @@ package dev.omialien.voicechat_recording;
 
 import com.mojang.logging.LogUtils;
 import de.maxhenkel.voicechat.api.VoicechatApi;
+import de.maxhenkel.voicechat.api.VoicechatServerApi;
 import dev.omialien.voicechat_recording.commands.*;
 import dev.omialien.voicechat_recording.configs.RecordingServerConfig;
 import dev.omialien.voicechat_recording.taskscheduler.TaskScheduler;
 import dev.omialien.voicechat_recording.voicechat.RecordedPlayer;
+import dev.omialien.voicechat_recording.voicechat.RecordingSimpleVoiceChatPlugin;
 import net.minecraft.world.level.storage.LevelResource;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.RegisterCommandsEvent;
@@ -42,6 +44,7 @@ public class RecordingSimpleVoiceChat {
 
     @SubscribeEvent
     public void onServerStarting(ServerStartingEvent event) {
+        RecordingSimpleVoiceChatPlugin.addCategory(RecordingSimpleVoiceChat.MOD_ID, "Recording Plugin", "Description", null, (VoicechatServerApi) vcApi);
         RecordingSimpleVoiceChat.LOGGER.debug("Server starting");
         RecordedPlayer.audiosPath = event.getServer().getWorldPath(RecordingSimpleVoiceChat.AUDIO_DIRECTORY);
         if(!Files.exists(RecordedPlayer.audiosPath)){
