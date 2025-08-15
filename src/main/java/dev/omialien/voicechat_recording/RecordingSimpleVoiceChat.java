@@ -29,6 +29,7 @@ public class RecordingSimpleVoiceChat {
     public static TaskScheduler TASKS;
     // Define mod id in a common place for everything to reference
     public static final String MOD_ID = "voicechat_recording";
+    public static final String CATEGORY_ID = "recording_vc";
     public static final LevelResource AUDIO_DIRECTORY = new LevelResource("player_audios");
     // Directly reference a slf4j logger
     public static final Logger LOGGER = LogUtils.getLogger();
@@ -44,7 +45,7 @@ public class RecordingSimpleVoiceChat {
 
     @SubscribeEvent
     public void onServerStarting(ServerStartingEvent event) {
-        RecordingSimpleVoiceChatPlugin.addCategory(RecordingSimpleVoiceChat.MOD_ID, "Recording Plugin", "Description", null, (VoicechatServerApi) vcApi);
+        RecordingSimpleVoiceChatPlugin.addCategory(RecordingSimpleVoiceChat.CATEGORY_ID, "Recording Plugin", "Description", null, (VoicechatServerApi) vcApi);
         RecordingSimpleVoiceChat.LOGGER.debug("Server starting");
         RecordedPlayer.audiosPath = event.getServer().getWorldPath(RecordingSimpleVoiceChat.AUDIO_DIRECTORY);
         if(!Files.exists(RecordedPlayer.audiosPath)){

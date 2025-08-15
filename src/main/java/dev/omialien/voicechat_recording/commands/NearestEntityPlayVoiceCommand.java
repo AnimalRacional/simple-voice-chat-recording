@@ -103,7 +103,7 @@ public class NearestEntityPlayVoiceCommand {
         RecordingSimpleVoiceChat.LOGGER.debug("Entity: " + entity.getName());
         for (GameProfile player : players) {
             UUID channelID = UUID.randomUUID();
-            EntityAudioChannel channel = createChannel(api, channelID, RecordingSimpleVoiceChat.MOD_ID, entity);
+            EntityAudioChannel channel = createChannel(api, channelID, RecordingSimpleVoiceChat.CATEGORY_ID, entity);
             RecordingSimpleVoiceChat.LOGGER.debug("Created new channel: " + channel);
             short[] audio = RecordingSimpleVoiceChatPlugin.getAudio(player.getId(), index, remove);
             if(audio != null){
