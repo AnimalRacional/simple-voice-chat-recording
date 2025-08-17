@@ -1,7 +1,7 @@
 package dev.omialien.voicechat_recording.commands;
 
-import dev.omialien.voicechat_recording.RecordingSimpleVoiceChat;
-import dev.omialien.voicechat_recording.voicechat.RecordingSimpleVoiceChatPlugin;
+import dev.omialien.voicechat_recording.VoiceChatRecording;
+import dev.omialien.voicechat_recording.voicechat.VoiceChatRecordingPlugin;
 import com.mojang.authlib.GameProfile;
 import com.mojang.brigadier.CommandDispatcher;
 import net.minecraft.commands.CommandSourceStack;
@@ -28,11 +28,11 @@ public class isRecordingCommand {
             Collection<GameProfile> targets = GameProfileArgument.getGameProfiles(cmdSrc, "targets");
 
             for (GameProfile target : targets) {
-                sb.append(target.getName()).append(": ").append(RecordingSimpleVoiceChatPlugin.getRecordedPlayer(target.getId()).isRecording());
+                sb.append(target.getName()).append(": ").append(VoiceChatRecordingPlugin.getRecordedPlayer(target.getId()).isRecording());
                 if (targets.size() != 1) sb.append("\n");
             }
 
-            RecordingSimpleVoiceChat.LOGGER.debug(sb.toString());
+            VoiceChatRecording.LOGGER.debug(sb.toString());
 
             cmdSrc.getSource().sendSuccess(() -> Component.literal(sb.toString()), false);
             return 1;

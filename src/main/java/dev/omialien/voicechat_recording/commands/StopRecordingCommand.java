@@ -1,6 +1,6 @@
 package dev.omialien.voicechat_recording.commands;
 
-import dev.omialien.voicechat_recording.voicechat.RecordingSimpleVoiceChatPlugin;
+import dev.omialien.voicechat_recording.voicechat.VoiceChatRecordingPlugin;
 import com.mojang.brigadier.CommandDispatcher;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
@@ -14,7 +14,7 @@ public class StopRecordingCommand {
 
             Player player = cmdSrc.getSource().getPlayerOrException();
 
-            RecordingSimpleVoiceChatPlugin.stopRecording(player.getUUID());
+            VoiceChatRecordingPlugin.stopRecording(player.getUUID());
 
             cmdSrc.getSource().sendSuccess(() -> Component.literal("Stopped Recording for " + player.getGameProfile().getName() + "..."), false);
 

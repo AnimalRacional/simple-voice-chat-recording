@@ -1,6 +1,6 @@
 package dev.omialien.voicechat_recording.taskscheduler;
 
-import dev.omialien.voicechat_recording.RecordingSimpleVoiceChat;
+import dev.omialien.voicechat_recording.VoiceChatRecording;
 
 public class TaskScheduler {
     private Task nextTask;
@@ -60,7 +60,7 @@ public class TaskScheduler {
     public void debug(){
         Task cur = nextTask;
         while(cur != null){
-            RecordingSimpleVoiceChat.LOGGER.debug("Executed at: {}", cur.getTime());
+            VoiceChatRecording.LOGGER.debug("Executed at: {}", cur.getTime());
             cur.run();
             cur = cur.getNext();
         }

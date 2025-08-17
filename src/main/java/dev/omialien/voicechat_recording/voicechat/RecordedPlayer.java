@@ -1,8 +1,8 @@
 package dev.omialien.voicechat_recording.voicechat;
 
 import de.maxhenkel.voicechat.api.opus.OpusDecoder;
-import dev.omialien.voicechat_recording.RecordingSimpleVoiceChat;
-import dev.omialien.voicechat_recording.configs.RecordingServerConfig;
+import dev.omialien.voicechat_recording.VoiceChatRecording;
+import dev.omialien.voicechat_recording.configs.RecordingCommonConfig;
 import dev.omialien.voicechat_recording.voicechat.audio.AudioDirectoryReader;
 import dev.omialien.voicechat_recording.voicechat.audio.AudioSaver;
 
@@ -34,19 +34,19 @@ public class RecordedPlayer {
         this.recording = new short[RECORDING_SIZE];
         this.recordedAudios = new ArrayList<>();
         this.lastSpoke = NOT_SPOKEN_YET;
-        RecordingSimpleVoiceChat.LOGGER.debug("Created RecordedPlayer {}", uuid);
+        VoiceChatRecording.LOGGER.debug("Created RecordedPlayer {}", uuid);
     }
 
     public void loadAudios(){
         Path userPath = audiosPath.resolve(this.uuid.toString());
         if(Files.exists(userPath)){
-            RecordingSimpleVoiceChat.LOGGER.debug("userpath exists");
+            VoiceChatRecording.LOGGER.debug("userpath exists");
             // TODO if a player records 200 audios alone, leaves, and then joins back later after other players started recording their own audios, all the audios will be added, leading to all audios in the server belonging to the same player
             (new AudioDirectoryReader(userPath, true,
-                    (audio) -> RecordingSimpleVoiceChatPlugin.addAudio(uuid, audio),
+                    (audio) -> VoiceChatRecordingPlugin.addAudio(uuid, audio),
                     (path) -> {
                         String filename = path.getFileName().toString();
-                        RecordingSimpleVoiceChat.LOGGER.debug("Reading {} {}/{} ({})", filename, filename.startsWith("audio-"), filename.endsWith(".pcm"), path);
+                        VoiceChatRecording.LOGGER.debug("Reading {} {}/{} ({})", filename, filename.startsWith("audio-"), filename.endsWith(".pcm"), path);
                         return filename.startsWith("audio-") && filename.endsWith(".pcm");
             })).start();
         }
@@ -54,7 +54,7 @@ public class RecordedPlayer {
 
     private boolean savingaudios = false;
     public void saveAudios(){
-        if(!RecordingSimpleVoiceChatPlugin.getPrivacy(uuid) && !savingaudios){ // This method should only ever happen once per RecordedPlayer, no more no less
+        if(!VoiceChatRecordingPlugin.getPrivacy(uuid) && !savingaudios){ // This method should only ever happen once per RecordedPlayer, no more no less
             savingaudios = true;
             Path userPath = audiosPath.resolve(this.uuid.toString());
             try{
@@ -66,7 +66,7 @@ public class RecordedPlayer {
                     new AudioSaver(userPath.resolve("audio-" + i + ".pcm"), cur.length, cur).start();
                 }
             } catch(IOException e){
-                RecordingSimpleVoiceChat.LOGGER.error("Error saving audios for {}:\r\n{}\r\n{}", uuid, e.getMessage(), e.getStackTrace());
+                VoiceChatRecording.LOGGER.error("Error saving audios for {}:\r\n{}\r\n{}", uuid, e.getMessage(), e.getStackTrace());
             }
         }
     }
@@ -92,19 +92,20 @@ public class RecordedPlayer {
             if (filterAudio()){
                 short[] savedRecording = new short[recordingSize];
                 System.arraycopy(recording, 0, savedRecording, 0, recordingSize);
-                RecordingSimpleVoiceChatPlugin.addAudio(uuid, savedRecording);
-                RecordingSimpleVoiceChat.LOGGER.debug("Added audio to MEMORY for player: " + uuid.toString());
+                VoiceChatRecordingPlugin.addAudio(uuid, savedRecording);
+                VoiceChatRecording.LOGGER.debug("Added audio to MEMORY for player: " + uuid.toString());
             } else {
-                RecordingSimpleVoiceChat.LOGGER.debug("Audio filtered, not storing");
+                VoiceChatRecording.LOGGER.debug("Audio filtered, not storing");
             }
             currentRecordingIndex = 0;
+            recordingSize = 0;
         }
     }
 
     public void recordPacket(byte[] packet) {
         if (isRecording) {
             if (decoder == null) {
-                RecordingSimpleVoiceChat.LOGGER.warn("Decoder is not initialized!");
+                VoiceChatRecording.LOGGER.warn("Decoder is not initialized!");
                 return;
             }
             try {
@@ -112,7 +113,8 @@ public class RecordedPlayer {
                 if (decodedPacket.length + currentRecordingIndex < RECORDING_SIZE){
                     boolean active = false;
                     for (short value : decodedPacket) {
-                        if (Math.abs(value) >= RecordingServerConfig.SILENCE_THRESHOLD.get()) {
+                        if (Math.abs(value) >= RecordingCommonConfig.SILENCE_THRESHOLD.get()) {
+                            VoiceChatRecording.LOGGER.debug("Active packet: {} {}", decodedPacket.length, decodedPacket[50]);
                             setLastSpoke(System.currentTimeMillis());
                             setSilent(false);
                             active = true;
@@ -128,11 +130,11 @@ public class RecordedPlayer {
                         recordingSize = currentRecordingIndex;
                     }
                 } else {
-                    RecordingSimpleVoiceChat.LOGGER.warn("Recording buffer full!");
+                    VoiceChatRecording.LOGGER.warn("Recording buffer full!");
                     stopRecording();
                 }
             } catch (Exception e) {
-                RecordingSimpleVoiceChat.LOGGER.error("Error decoding packet: {}", e.getMessage());
+                VoiceChatRecording.LOGGER.error("Error decoding packet: {}", e.getMessage());
             }
         }
     }
@@ -149,14 +151,14 @@ public class RecordedPlayer {
         if(idx < 0 || idx >= recordedAudios.size()){
             return null;
         }
-        if(remove && RecordingSimpleVoiceChatPlugin.getAudioCount() > RecordingServerConfig.MINIMUM_AUDIO_COUNT.get()){
-            RecordingSimpleVoiceChat.LOGGER.debug("removing audio {}", idx);
+        if(remove && VoiceChatRecordingPlugin.getAudioCount() > RecordingCommonConfig.MINIMUM_AUDIO_COUNT.get()){
+            VoiceChatRecording.LOGGER.debug("removing audio {}", idx);
             short[] audio = removeAudio(idx);
-            RecordingSimpleVoiceChat.LOGGER.debug("REMOVING audio {}: {}", idx, audio.length);
+            VoiceChatRecording.LOGGER.debug("REMOVING audio {}: {}", idx, audio.length);
             return audio;
         }
         short[] audio = recordedAudios.get(idx);
-        RecordingSimpleVoiceChat.LOGGER.debug("getting audio {}: {}", idx, audio.length);
+        VoiceChatRecording.LOGGER.debug("getting audio {}: {}", idx, audio.length);
         return audio;
     }
     public short[] getRandomAudio(boolean remove){
@@ -171,7 +173,7 @@ public class RecordedPlayer {
 
     public void startRecording() {
         if (!isRecording) {
-            decoder = RecordingSimpleVoiceChat.vcApi.createDecoder();
+            decoder = VoiceChatRecording.vcApi.createDecoder();
             isRecording = true;
         }
     }
@@ -204,29 +206,29 @@ public class RecordedPlayer {
 
         double durationSeconds = (double) recordingSize / SAMPLE_RATE;
         if (durationSeconds <= MIN_DURATION) {
-            RecordingSimpleVoiceChat.LOGGER.debug("Audio too short: " + durationSeconds + "s");
+            VoiceChatRecording.LOGGER.debug("Audio too short: " + durationSeconds + "s");
             return false;
         }
         if (durationSeconds > MAX_DURATION) {
-            RecordingSimpleVoiceChat.LOGGER.debug("Audio too long: " + durationSeconds + "s");
+            VoiceChatRecording.LOGGER.debug("Audio too long: " + durationSeconds + "s");
             return false;
         }
 
         int start = 0;
         while (start < recordingSize &&
-                Math.abs(recording[start]) < RecordingServerConfig.SILENCE_THRESHOLD.get()) {
+                Math.abs(recording[start]) < RecordingCommonConfig.SILENCE_THRESHOLD.get()) {
             start++;
         }
 
         int end = recordingSize - 1;
         while (end > start &&
-                Math.abs(recording[end]) < RecordingServerConfig.SILENCE_THRESHOLD.get()) {
+                Math.abs(recording[end]) < RecordingCommonConfig.SILENCE_THRESHOLD.get()) {
             end--;
         }
 
         int activeSamples = end - start + 1;
         if (activeSamples <= 0) {
-            RecordingSimpleVoiceChat.LOGGER.debug("No active audio found above silence threshold");
+            VoiceChatRecording.LOGGER.debug("No active audio found above silence threshold");
             return false;
         }
 
@@ -238,7 +240,7 @@ public class RecordedPlayer {
         }
         double rms = Math.sqrt(sumSquares / (double) activeSamples);
 
-        RecordingSimpleVoiceChat.LOGGER.debug(String.format(
+        VoiceChatRecording.LOGGER.debug(String.format(
                 "Audio duration: %.3fs, Active region: %.3fs, RMS: %.1f",
                 durationSeconds,
                 (double) activeSamples / SAMPLE_RATE,

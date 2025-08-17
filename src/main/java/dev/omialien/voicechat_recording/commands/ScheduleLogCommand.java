@@ -1,6 +1,6 @@
 package dev.omialien.voicechat_recording.commands;
 
-import dev.omialien.voicechat_recording.RecordingSimpleVoiceChat;
+import dev.omialien.voicechat_recording.VoiceChatRecording;
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
@@ -16,7 +16,7 @@ public class ScheduleLogCommand {
                                 .then(Commands.argument("text", StringArgumentType.greedyString())
                                         .executes((src) -> {
                                             String text = StringArgumentType.getString(src, "text");
-                                            RecordingSimpleVoiceChat.TASKS.schedule(() -> RecordingSimpleVoiceChat.LOGGER.debug(text), IntegerArgumentType.getInteger(src, "ticks"));
+                                            VoiceChatRecording.TASKS.schedule(() -> VoiceChatRecording.LOGGER.debug(text), IntegerArgumentType.getInteger(src, "ticks"));
                                             return 1;
                                 })))
         );

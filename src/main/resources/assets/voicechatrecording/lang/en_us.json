@@ -1,0 +1,22 @@
+{
+  "itemGroup.voicechatrecording": "Example Mod Tab",
+  "block.voicechatrecording.example_block": "Example Block",
+  "item.voicechatrecording.example_item": "Example Item",
+
+  "voicechatrecording.configuration.title": "Voice Chat Recording Configs",
+  "voicechatrecording.configuration.section.voicechatrecording.common.toml": "Voice Chat Recording Common Configs",
+  "voicechatrecording.configuration.section.voicechatrecording.common.toml.title": "Voice Chat Recording Common Configs",
+  "voicechatrecording.configuration.maxSavedRecordings": "Max Saved Recordings",
+  "voicechatrecording.configuration.silenceThreshold": "Silence Threshold",
+  "voicechatrecording.configuration.readingThreadCount": "Audio Reading Thread Count",
+  "voicechatrecording.configuration.minimumAudioCount": "Minimum Audio Count",
+  "voicechatrecording.configuration.maxSavedRecordings.tooltip": "Maximum amount of audios that will be saved in memory",
+  "voicechatrecording.configuration.silenceThreshold.tooltip": "Amplitude threshold to detect speech. Change this if your voice is detected even when you're not speaking",
+  "voicechatrecording.configuration.readingThreadCount.tooltip": "How many threads are used to read the saved audios from a player that joins the server. Lower this if a player joining the server lags, and raise it if it doesn't but audio reading is too slow.",
+  "voicechatrecording.configuration.minimumAudioCount.tooltip":"The minimum amount of audios to keep in memory; audios are only gonna be removed if it won't make the total audio count go below this number. Having this number too high may mean repeated audios being used for too long.",
+
+  "voicechatrecording.configuration.section.voicechatrecording.client.toml.title": "Voice Chat Recording Client Configs",
+  "voicechatrecording.configuration.section.voicechatrecording.client.toml": "Voice Chat Recording Client Configs",
+  "voicechatrecording.configuration.privacyMode.tooltip": "Whether servers you play on store your audios on their disk. If true, leaving and rejoining will delete all currently saved audios of you.",
+  "voicechatrecording.configuration.privacyMode": "Privacy Mode"
+}

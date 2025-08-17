@@ -1,7 +1,7 @@
 package dev.omialien.voicechat_recording.commands;
 
-import dev.omialien.voicechat_recording.RecordingSimpleVoiceChat;
-import dev.omialien.voicechat_recording.voicechat.RecordingSimpleVoiceChatPlugin;
+import dev.omialien.voicechat_recording.VoiceChatRecording;
+import dev.omialien.voicechat_recording.voicechat.VoiceChatRecordingPlugin;
 import dev.omialien.voicechat_recording.voicechat.audio.AudioPlayer;
 import com.mojang.authlib.GameProfile;
 import com.mojang.brigadier.CommandDispatcher;
@@ -45,7 +45,7 @@ public class NearestEntityPlayVoiceCommand {
                         Commands.argument("players", GameProfileArgument.gameProfile())
                                 .then(Commands.argument("index", IntegerArgumentType.integer())
                                         .executes((ctx) ->{
-                                            RecordingSimpleVoiceChat.LOGGER.debug("pl ind");
+                                            VoiceChatRecording.LOGGER.debug("pl ind");
                                             return runCommand(ctx, null,
                                                     GameProfileArgument.getGameProfiles(ctx, "players"),
                                                     IntegerArgumentType.getInteger(ctx, "index"),
@@ -53,7 +53,7 @@ public class NearestEntityPlayVoiceCommand {
                                         })
                                         .then(removeArgument
                                                 .executes((ctx) ->{
-                                                    RecordingSimpleVoiceChat.LOGGER.debug("pl ind rem");
+                                                    VoiceChatRecording.LOGGER.debug("pl ind rem");
                                                     try{
                                                         return runCommand(
                                                                 ctx, null,
@@ -62,13 +62,13 @@ public class NearestEntityPlayVoiceCommand {
                                                                 BoolArgumentType.getBool(ctx, "remove")
                                                         );
                                                     } catch(Exception e){
-                                                        RecordingSimpleVoiceChat.LOGGER.error("error command {}\n{}", e.getMessage(), e.getStackTrace());
+                                                        VoiceChatRecording.LOGGER.error("error command {}\n{}", e.getMessage(), e.getStackTrace());
                                                     }
                                                     return 999;
                                                 }))
                                         .then(Commands.argument("entity", EntityArgument.entities())
                                                 .executes((ctx) ->{
-                                                    RecordingSimpleVoiceChat.LOGGER.debug("ent plr ind");
+                                                    VoiceChatRecording.LOGGER.debug("ent plr ind");
                                                     return runCommand(
                                                         ctx, EntityArgument.getEntities(ctx, "entity"),
                                                         GameProfileArgument.getGameProfiles(ctx, "players"),
@@ -76,7 +76,7 @@ public class NearestEntityPlayVoiceCommand {
                                                         false);
                                                 })
                                                 .then(removeArgument.executes((ctx) -> {
-                                                    RecordingSimpleVoiceChat.LOGGER.debug("ent pl ind rem");
+                                                    VoiceChatRecording.LOGGER.debug("ent pl ind rem");
                                                     return runCommand(
                                                         ctx, EntityArgument.getEntities(ctx, "entity"),
                                                         GameProfileArgument.getGameProfiles(ctx, "players"),
@@ -100,12 +100,12 @@ public class NearestEntityPlayVoiceCommand {
     private static void playAudio(CommandContext<CommandSourceStack> ctx,
                                   Entity entity, Collection<GameProfile> players, int index, boolean remove,
                                   VoicechatServerApi api){
-        RecordingSimpleVoiceChat.LOGGER.debug("Entity: " + entity.getName());
+        VoiceChatRecording.LOGGER.debug("Entity: " + entity.getName());
         for (GameProfile player : players) {
             UUID channelID = UUID.randomUUID();
-            EntityAudioChannel channel = createChannel(api, channelID, RecordingSimpleVoiceChat.CATEGORY_ID, entity);
-            RecordingSimpleVoiceChat.LOGGER.debug("Created new channel: " + channel);
-            short[] audio = RecordingSimpleVoiceChatPlugin.getAudio(player.getId(), index, remove);
+            EntityAudioChannel channel = createChannel(api, channelID, VoiceChatRecording.CATEGORY_ID, entity);
+            VoiceChatRecording.LOGGER.debug("Created new channel: " + channel);
+            short[] audio = VoiceChatRecordingPlugin.getAudio(player.getId(), index, remove);
             if(audio != null){
                 ctx.getSource().sendSuccess(() ->
                         Component.literal("Playing audio from " + player.getName() + " index " + index + " from " + entity.getName()), true);
@@ -120,7 +120,7 @@ public class NearestEntityPlayVoiceCommand {
                                  @Nullable Collection<? extends Entity> targets,
                                  @NotNull Collection<GameProfile> players, int index, boolean remove){
         try{
-            if(RecordingSimpleVoiceChat.vcApi instanceof VoicechatServerApi api){
+            if(VoiceChatRecording.vcApi instanceof VoicechatServerApi api){
                 Collection<Entity> entities = targets == null ? null : targets.stream().map((e) -> (Entity)e).toList();
                 if(entities == null){
                     // If no entities are specified, use the nearest entity
@@ -139,7 +139,7 @@ public class NearestEntityPlayVoiceCommand {
             }
             return 50;
         } catch(Exception e){
-            RecordingSimpleVoiceChat.LOGGER.error("Error running playVoice: {}\r\n{}", e.getMessage(), e.getStackTrace());
+            VoiceChatRecording.LOGGER.error("Error running playVoice: {}\r\n{}", e.getMessage(), e.getStackTrace());
             return 100;
         }
     }
@@ -147,7 +147,7 @@ public class NearestEntityPlayVoiceCommand {
     private static EntityAudioChannel createChannel(VoicechatServerApi api, UUID channelID, String category, Entity nearestEntity) {
         EntityAudioChannel channel = api.createEntityAudioChannel(channelID, api.fromEntity(nearestEntity));
         if (channel == null) {
-            RecordingSimpleVoiceChat.LOGGER.error("Couldn't create channel");
+            VoiceChatRecording.LOGGER.error("Couldn't create channel");
             return null;
         }
         channel.setCategory(category); // The category of the audio channel

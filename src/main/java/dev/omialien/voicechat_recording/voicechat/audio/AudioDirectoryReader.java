@@ -1,7 +1,7 @@
 package dev.omialien.voicechat_recording.voicechat.audio;
 
-import dev.omialien.voicechat_recording.RecordingSimpleVoiceChat;
-import dev.omialien.voicechat_recording.configs.RecordingServerConfig;
+import dev.omialien.voicechat_recording.VoiceChatRecording;
+import dev.omialien.voicechat_recording.configs.RecordingCommonConfig;
 
 import java.io.*;
 import java.nio.file.DirectoryStream;
@@ -38,8 +38,8 @@ public class AudioDirectoryReader extends Thread{
     public void run() {
         try(DirectoryStream<Path> stream = Files.newDirectoryStream(path)){
             Iterator<Path> iter = stream.iterator();
-            RecordingSimpleVoiceChat.LOGGER.debug("getting audios...");
-            ExecutorService threadPool = Executors.newFixedThreadPool(RecordingServerConfig.AUDIO_READER_THREAD_COUNT.get());
+            VoiceChatRecording.LOGGER.debug("getting audios...");
+            ExecutorService threadPool = Executors.newFixedThreadPool(RecordingCommonConfig.AUDIO_READER_THREAD_COUNT.get());
             while(iter.hasNext()) {
                 Path cur = iter.next();
                 if(shouldRead.test(cur)){
@@ -49,18 +49,18 @@ public class AudioDirectoryReader extends Thread{
                             try{
                                 Files.delete(cur);
                             } catch(IOException e){
-                                RecordingSimpleVoiceChat.LOGGER.error("Error deleting file {}\r\n{}\r\n{}", cur, e.getMessage(), e.getStackTrace());
+                                VoiceChatRecording.LOGGER.error("Error deleting file {}\r\n{}\r\n{}", cur, e.getMessage(), e.getStackTrace());
                             }
                         }
-                        RecordingSimpleVoiceChat.LOGGER.debug("Finishing task for {}", cur);
+                        VoiceChatRecording.LOGGER.debug("Finishing task for {}", cur);
                     });
                 } else {
-                    RecordingSimpleVoiceChat.LOGGER.warn("Unkown file found in audio folder {}: {}", path, cur);
+                    VoiceChatRecording.LOGGER.warn("Unkown file found in audio folder {}: {}", path, cur);
                     if(destroy){
                         try{
                             Files.delete(cur);
                         } catch(IOException e){
-                            RecordingSimpleVoiceChat.LOGGER.error("Error deleting unknown file {}\r\n{}\r\n{}", cur, e.getMessage(), e.getStackTrace());
+                            VoiceChatRecording.LOGGER.error("Error deleting unknown file {}\r\n{}\r\n{}", cur, e.getMessage(), e.getStackTrace());
                         }
                     }
                 }
@@ -69,21 +69,21 @@ public class AudioDirectoryReader extends Thread{
             try{
                 threadPool.shutdown();
                 if(!threadPool.awaitTermination(120, TimeUnit.SECONDS)){
-                    RecordingSimpleVoiceChat.LOGGER.error("Couldn't finish reading audios in {}!", path);
+                    VoiceChatRecording.LOGGER.error("Couldn't finish reading audios in {}!", path);
                 } else {
-                    RecordingSimpleVoiceChat.LOGGER.info("Finished reading audios in {}!", path);
+                    VoiceChatRecording.LOGGER.info("Finished reading audios in {}!", path);
                 }
             } catch(InterruptedException e){
-                RecordingSimpleVoiceChat.LOGGER.debug("AudioReader thread pool interrupted!\r\n{}\r\n{}", e.getMessage(), e.getStackTrace());
+                VoiceChatRecording.LOGGER.debug("AudioReader thread pool interrupted!\r\n{}\r\n{}", e.getMessage(), e.getStackTrace());
             }
         } catch(IOException e){
-            RecordingSimpleVoiceChat.LOGGER.error("Error reading audio\r\n{}\r\n{}", e.getMessage(), e.getStackTrace());
+            VoiceChatRecording.LOGGER.error("Error reading audio\r\n{}\r\n{}", e.getMessage(), e.getStackTrace());
         }
         if(destroy){
             try{
                 Files.delete(path);
             } catch(IOException e){
-                RecordingSimpleVoiceChat.LOGGER.error("Couldn't delete directory {}\r\n{}\r\n{}", path, e.getMessage(), e.getStackTrace());
+                VoiceChatRecording.LOGGER.error("Couldn't delete directory {}\r\n{}\r\n{}", path, e.getMessage(), e.getStackTrace());
             }
         }
     }
@@ -99,12 +99,12 @@ public class AudioDirectoryReader extends Thread{
                 audio[i] = dis.readShort();
             }
             dis.close();
-            RecordingSimpleVoiceChat.LOGGER.debug("Read from the file!");
+            VoiceChatRecording.LOGGER.debug("Read from the file!");
             return audio;
         } catch (FileNotFoundException e){
-            RecordingSimpleVoiceChat.LOGGER.error("AUDIOREADER File not found: {}", path);
+            VoiceChatRecording.LOGGER.error("AUDIOREADER File not found: {}", path);
         } catch (Exception e) {
-            RecordingSimpleVoiceChat.LOGGER.error("ERROR ON AUDIOREADER: {}", e.getMessage());
+            VoiceChatRecording.LOGGER.error("ERROR ON AUDIOREADER: {}", e.getMessage());
             throw new RuntimeException(e);
         }
         return null;

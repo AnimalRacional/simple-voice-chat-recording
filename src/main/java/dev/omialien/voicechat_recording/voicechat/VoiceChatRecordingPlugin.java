@@ -1,7 +1,7 @@
 package dev.omialien.voicechat_recording.voicechat;
 
-import dev.omialien.voicechat_recording.RecordingSimpleVoiceChat;
-import dev.omialien.voicechat_recording.configs.RecordingServerConfig;
+import dev.omialien.voicechat_recording.VoiceChatRecording;
+import dev.omialien.voicechat_recording.configs.RecordingCommonConfig;
 import de.maxhenkel.voicechat.api.*;
 import de.maxhenkel.voicechat.api.events.*;
 
@@ -9,7 +9,7 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 @ForgeVoicechatPlugin
-public class RecordingSimpleVoiceChatPlugin implements VoicechatPlugin {
+public class VoiceChatRecordingPlugin implements VoicechatPlugin {
     public static final int SAMPLE_RATE = 48000;
     private static Map<UUID, RecordedPlayer> recordedPlayers;
     private static Map<UUID, Boolean> privacyMode;
@@ -20,7 +20,7 @@ public class RecordingSimpleVoiceChatPlugin implements VoicechatPlugin {
      */
     @Override
     public String getPluginId() {
-        return RecordingSimpleVoiceChat.MOD_ID;
+        return VoiceChatRecording.MOD_ID;
     }
 
     /**
@@ -30,8 +30,8 @@ public class RecordingSimpleVoiceChatPlugin implements VoicechatPlugin {
      */
     @Override
     public void initialize(VoicechatApi api) {
-        RecordingSimpleVoiceChat.LOGGER.debug("Revervox voice chat plugin initialized!");
-        RecordingSimpleVoiceChat.vcApi = api;
+        VoiceChatRecording.LOGGER.debug("Revervox voice chat plugin initialized!");
+        VoiceChatRecording.vcApi = api;
         categories = new LinkedList<>();
     }
 
@@ -88,18 +88,18 @@ public class RecordingSimpleVoiceChatPlugin implements VoicechatPlugin {
 
         recordedPlayers = new ConcurrentHashMap<>();
         privacyMode = new ConcurrentHashMap<>();
-        RecordingSimpleVoiceChat.LOGGER.debug("STARTING SCHEDULER");
-        RecordingSimpleVoiceChat.TASKS.schedule(checkForSilence(), 20);
+        VoiceChatRecording.LOGGER.debug("STARTING SCHEDULER");
+        VoiceChatRecording.TASKS.schedule(checkForSilence(), 20);
     }
 
     public static void stopRecording(UUID uuid) {
         recordedPlayers.get(uuid).stopRecording();
-        RecordingSimpleVoiceChat.LOGGER.debug("Stopped recording for player: " + uuid.toString());
+        VoiceChatRecording.LOGGER.debug("Stopped recording for player: " + uuid.toString());
     }
 
     public static void startRecording(UUID uuid) {
         recordedPlayers.get(uuid).startRecording();
-        RecordingSimpleVoiceChat.LOGGER.debug("Recording started for player: " + uuid.toString());
+        VoiceChatRecording.LOGGER.debug("Recording started for player: " + uuid.toString());
     }
 
     public static RecordedPlayer getRecordedPlayer(UUID uuid) {
@@ -142,9 +142,9 @@ public class RecordingSimpleVoiceChatPlugin implements VoicechatPlugin {
     // um player com 199 audios e outro com 1 vão ter a mesma chance de ser escolhidos para dar replace a um dos seus áudios
     public static void replaceRandomAudio(short[] audio){
         List<RecordedPlayer> hasAudio = recordedPlayers.values().stream().filter((r) -> r.getAudioCount() > 0).toList();
-        RecordingSimpleVoiceChat.LOGGER.debug("hasAudio: {}", hasAudio.size());
+        VoiceChatRecording.LOGGER.debug("hasAudio: {}", hasAudio.size());
         if(hasAudio.isEmpty()){
-            RecordingSimpleVoiceChat.LOGGER.error("replaceRandomAudio called when no one has audios");
+            VoiceChatRecording.LOGGER.error("replaceRandomAudio called when no one has audios");
             return;
         }
         hasAudio.get((new Random()).nextInt(hasAudio.size())).replaceRandomAudio(audio);
@@ -155,7 +155,7 @@ public class RecordingSimpleVoiceChatPlugin implements VoicechatPlugin {
         if(player == null){
             return;
         }
-        if(getAudioCount() >= RecordingServerConfig.RECORDING_LIMIT.get()){
+        if(getAudioCount() >= RecordingCommonConfig.RECORDING_LIMIT.get()){
             replaceRandomAudio(audio);
         } else {
             player.addAudioDirect(audio);
@@ -164,14 +164,14 @@ public class RecordingSimpleVoiceChatPlugin implements VoicechatPlugin {
 
     private Runnable checkForSilence() {
         return () -> {
-            for (RecordedPlayer player : RecordingSimpleVoiceChatPlugin.getRecordedPlayers().values()) {
+            for (RecordedPlayer player : VoiceChatRecordingPlugin.getRecordedPlayers().values()) {
                 if(player.isSpeaking()) continue;
                 if (player.isSilent()) continue;
-                RecordingSimpleVoiceChat.LOGGER.debug("Stopped Speaking!");
-                RecordingSimpleVoiceChatPlugin.stopRecording(player.getUuid());
+                VoiceChatRecording.LOGGER.debug("Stopped Speaking!");
+                VoiceChatRecordingPlugin.stopRecording(player.getUuid());
                 player.setSilent(true);
             }
-            RecordingSimpleVoiceChat.TASKS.schedule(checkForSilence(), 25);
+            VoiceChatRecording.TASKS.schedule(checkForSilence(), 25);
         };
     }
 

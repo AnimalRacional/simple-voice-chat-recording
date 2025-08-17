@@ -1,9 +1,31 @@
-# User-specific stuff
-.idea/
+# eclipse
+bin
+*.launch
+.settings
+.metadata
+.classpath
+.project
 
-*.iml
+# idea
+out
 *.ipr
 *.iws
+*.iml
+.idea
+
+# gradle
+build
+.gradle
+
+# other
+eclipse
+run
+runs
+run-data
+
+repo
+# User-specific stuff
+.idea/
 
 # IntelliJ
 out/
@@ -100,7 +122,6 @@ $RECYCLE.BIN/
 # Windows shortcuts
 *.lnk
 
-.gradle
 build/
 
 # Ignore Gradle GUI config

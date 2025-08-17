@@ -1,6 +1,6 @@
 package dev.omialien.voicechat_recording.voicechat.audio;
 
-import dev.omialien.voicechat_recording.RecordingSimpleVoiceChat;
+import dev.omialien.voicechat_recording.VoiceChatRecording;
 
 import java.io.DataOutputStream;
 import java.io.FileOutputStream;
@@ -30,9 +30,9 @@ public class AudioSaver extends Thread{
             }
             dos.close();
 
-            RecordingSimpleVoiceChat.LOGGER.debug("Wrote recording to file {}", path);
+            VoiceChatRecording.LOGGER.debug("Wrote recording to file {}", path);
         } catch (IOException e){
-            RecordingSimpleVoiceChat.LOGGER.error(e.getMessage());
+            VoiceChatRecording.LOGGER.error(e.getMessage());
         }
     }
 }

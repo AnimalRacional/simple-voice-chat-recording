@@ -1,6 +1,6 @@
 package dev.omialien.voicechat_recording.voicechat.audio;
 
-import dev.omialien.voicechat_recording.RecordingSimpleVoiceChat;
+import dev.omialien.voicechat_recording.VoiceChatRecording;
 import de.maxhenkel.voicechat.api.VoicechatServerApi;
 import de.maxhenkel.voicechat.api.audiochannel.AudioChannel;
 
@@ -21,9 +21,9 @@ public class AudioPlayer extends Thread{
         try{
             playerAudioPlayer = api.createAudioPlayer(channel, api.createEncoder(), audio);
             playerAudioPlayer.startPlaying();
-            RecordingSimpleVoiceChat.LOGGER.debug("Playing Audio...");
+            VoiceChatRecording.LOGGER.debug("Playing Audio...");
         } catch(Exception e){
-            RecordingSimpleVoiceChat.LOGGER.error("ERROR {}", e.getMessage());
+            VoiceChatRecording.LOGGER.error("ERROR {}", e.getMessage());
             throw new RuntimeException(e);
         }
     }
