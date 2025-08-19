@@ -14,6 +14,7 @@ import net.minecraftforge.event.RegisterCommandsEvent;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.event.server.ServerStartingEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
+import net.minecraftforge.fml.ModLoadingContext;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.config.ModConfig;
 import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
@@ -34,11 +35,19 @@ public class RecordingSimpleVoiceChat {
     // Directly reference a slf4j logger
     public static final Logger LOGGER = LogUtils.getLogger();
 
-    public RecordingSimpleVoiceChat(FMLJavaModLoadingContext ctx) {
+    public RecordingSimpleVoiceChat(FMLJavaModLoadingContext ctx){
+        MinecraftForge.EVENT_BUS.register(this);
+        LOGGER.debug("FMLJavaModLoadingContext is being used!");
+        ctx.registerConfig(ModConfig.Type.SERVER, RecordingServerConfig.SPEC);
+        TASKS = new TaskScheduler();
+    }
+
+    public RecordingSimpleVoiceChat() {
+        LOGGER.warn("Old version: not using FMLJavaModLoadingContext");
         // Register ourselves for server and other game events we are interested in
         MinecraftForge.EVENT_BUS.register(this);
         // Register our mod's ForgeConfigSpec so that Forge can create and load the config file for us
-        ctx.registerConfig(ModConfig.Type.SERVER, RecordingServerConfig.SPEC);
+        ModLoadingContext.get().registerConfig(ModConfig.Type.SERVER, RecordingServerConfig.SPEC);
         TASKS = new TaskScheduler();
     }
 
