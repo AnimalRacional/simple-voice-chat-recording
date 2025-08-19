@@ -1,7 +1,5 @@
 {
-  "itemGroup.voicechatrecording": "Example Mod Tab",
-  "block.voicechatrecording.example_block": "Example Block",
-  "item.voicechatrecording.example_item": "Example Item",
+  "itemGroup.voicechatrecording": "Voice Chat Recording",
 
   "voicechatrecording.configuration.title": "Voice Chat Recording Configs",
   "voicechatrecording.configuration.section.voicechatrecording.common.toml": "Voice Chat Recording Common Configs",
