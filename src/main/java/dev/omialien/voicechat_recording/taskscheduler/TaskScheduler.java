@@ -12,8 +12,8 @@ public class TaskScheduler {
     }
 
     public void tick(){
-        time++;
         if(nextTask != null){
+            time++;
             Task cur = nextTask;
             while(cur != null && cur.getTime() <= time){
                 cur.run();

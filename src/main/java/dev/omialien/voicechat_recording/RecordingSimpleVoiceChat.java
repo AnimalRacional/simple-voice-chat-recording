@@ -76,7 +76,7 @@ public class RecordingSimpleVoiceChat {
 
     @SubscribeEvent
     public void tickEvent(TickEvent event){
-        if(event.phase == TickEvent.Phase.END){
+        if(event.type == TickEvent.Type.SERVER && event.phase == TickEvent.Phase.END){
             TASKS.tick();
         }
     }
