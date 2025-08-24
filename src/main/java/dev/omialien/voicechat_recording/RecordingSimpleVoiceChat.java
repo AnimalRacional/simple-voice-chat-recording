@@ -4,16 +4,21 @@ import com.mojang.logging.LogUtils;
 import de.maxhenkel.voicechat.api.VoicechatApi;
 import de.maxhenkel.voicechat.api.VoicechatServerApi;
 import dev.omialien.voicechat_recording.commands.*;
+import dev.omialien.voicechat_recording.configs.RecordingClientConfig;
 import dev.omialien.voicechat_recording.configs.RecordingServerConfig;
+import dev.omialien.voicechat_recording.events.ClientForgeEventBus;
+import dev.omialien.voicechat_recording.networking.RecordingPacketHandler;
 import dev.omialien.voicechat_recording.taskscheduler.TaskScheduler;
 import dev.omialien.voicechat_recording.voicechat.RecordedPlayer;
 import dev.omialien.voicechat_recording.voicechat.RecordingSimpleVoiceChatPlugin;
 import net.minecraft.world.level.storage.LevelResource;
+import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.RegisterCommandsEvent;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.event.server.ServerStartingEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
+import net.minecraftforge.fml.DistExecutor;
 import net.minecraftforge.fml.ModLoadingContext;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.config.ModConfig;
@@ -38,7 +43,10 @@ public class RecordingSimpleVoiceChat {
     public RecordingSimpleVoiceChat(FMLJavaModLoadingContext ctx){
         MinecraftForge.EVENT_BUS.register(this);
         LOGGER.debug("FMLJavaModLoadingContext is being used!");
+        DistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> () -> MinecraftForge.EVENT_BUS.register(new ClientForgeEventBus()));
+        RecordingPacketHandler.registerPackets();
         ctx.registerConfig(ModConfig.Type.SERVER, RecordingServerConfig.SPEC);
+        ctx.registerConfig(ModConfig.Type.CLIENT, RecordingClientConfig.SPEC);
         TASKS = new TaskScheduler();
     }
 
@@ -46,8 +54,11 @@ public class RecordingSimpleVoiceChat {
         LOGGER.warn("Old version: not using FMLJavaModLoadingContext");
         // Register ourselves for server and other game events we are interested in
         MinecraftForge.EVENT_BUS.register(this);
+        DistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> () -> MinecraftForge.EVENT_BUS.register(new ClientForgeEventBus()));
+        RecordingPacketHandler.registerPackets();
         // Register our mod's ForgeConfigSpec so that Forge can create and load the config file for us
         ModLoadingContext.get().registerConfig(ModConfig.Type.SERVER, RecordingServerConfig.SPEC);
+        ModLoadingContext.get().registerConfig(ModConfig.Type.CLIENT, RecordingClientConfig.SPEC);
         TASKS = new TaskScheduler();
     }
 
