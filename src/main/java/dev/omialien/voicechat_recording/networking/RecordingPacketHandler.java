@@ -9,7 +9,7 @@ import net.minecraftforge.network.simple.SimpleChannel;
 public class RecordingPacketHandler {
     private static final String PROTOCOL_VERSION = "1";
     public static final SimpleChannel INSTANCE = NetworkRegistry.newSimpleChannel(
-            ResourceLocation.fromNamespaceAndPath(RecordingSimpleVoiceChat.MOD_ID, "main"),
+            new ResourceLocation(RecordingSimpleVoiceChat.MOD_ID, "main"),
             () -> PROTOCOL_VERSION,
             PROTOCOL_VERSION::equals,
             PROTOCOL_VERSION::equals
