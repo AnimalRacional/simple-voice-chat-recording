@@ -11,23 +11,24 @@ import java.util.Iterator;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 
 public class AudioDirectoryReader extends Thread{
     private final Path path;
     final boolean destroy;
-    final Consumer<short[]> reaction;
+    final BiConsumer<short[], Path> reaction;
     final Predicate<Path> shouldRead;
 
-    public AudioDirectoryReader(Path path, Consumer<short[]> reaction, Predicate<Path> shouldRead){
+    public AudioDirectoryReader(Path path, BiConsumer<short[], Path> reaction, Predicate<Path> shouldRead){
         this.path = path;
         this.destroy = false;
         this.reaction = reaction;
         this.shouldRead = shouldRead;
     }
 
-    public AudioDirectoryReader(Path path, boolean deleteAfter, Consumer<short[]> reaction, Predicate<Path> shouldRead) {
+    public AudioDirectoryReader(Path path, boolean deleteAfter, BiConsumer<short[], Path> reaction, Predicate<Path> shouldRead) {
         this.path = path;
         this.destroy = deleteAfter;
         this.reaction = reaction;
@@ -44,7 +45,7 @@ public class AudioDirectoryReader extends Thread{
                 Path cur = iter.next();
                 if(shouldRead.test(cur)){
                     threadPool.submit(() -> {
-                        reaction.accept(getFile(cur));
+                        reaction.accept(getFile(cur), cur);
                         if(destroy){
                             try{
                                 Files.delete(cur);
@@ -73,11 +74,13 @@ public class AudioDirectoryReader extends Thread{
                 } else {
                     VoiceChatRecording.LOGGER.info("Finished reading audios in {}!", path);
                 }
+                threadPool.close();
             } catch(InterruptedException e){
-                VoiceChatRecording.LOGGER.debug("AudioReader thread pool interrupted!\r\n{}\r\n{}", e.getMessage(), e.getStackTrace());
+                VoiceChatRecording.LOGGER.debug("AudioReader thread pool interrupted! {}\r\n{}\r\n{}", path, e.getMessage(), e.getStackTrace());
+                threadPool.close();
             }
         } catch(IOException e){
-            VoiceChatRecording.LOGGER.error("Error reading audio\r\n{}\r\n{}", e.getMessage(), e.getStackTrace());
+            VoiceChatRecording.LOGGER.error("Error reading audio in {}\r\n{}\r\n{}", path, e.getMessage(), e.getStackTrace());
         }
         if(destroy){
             try{

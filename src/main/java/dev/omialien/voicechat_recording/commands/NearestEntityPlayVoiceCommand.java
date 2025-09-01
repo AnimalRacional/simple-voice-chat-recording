@@ -105,7 +105,9 @@ public class NearestEntityPlayVoiceCommand {
             UUID channelID = UUID.randomUUID();
             EntityAudioChannel channel = createChannel(api, channelID, VoiceChatRecording.CATEGORY_ID, entity);
             VoiceChatRecording.LOGGER.debug("Created new channel: " + channel);
-            short[] audio = VoiceChatRecordingPlugin.getAudio(player.getId(), index, remove);
+            // TODO commands
+            //short[] audio = VoiceChatRecordingPlugin.getAudio(player.getId(), index, remove);
+            short[] audio = null;
             if(audio != null){
                 ctx.getSource().sendSuccess(() ->
                         Component.literal("Playing audio from " + player.getName() + " index " + index + " from " + entity.getName()), true);

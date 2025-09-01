@@ -4,7 +4,17 @@ import dev.omialien.voicechat_recording.VoiceChatRecording;
 import dev.omialien.voicechat_recording.configs.RecordingCommonConfig;
 import de.maxhenkel.voicechat.api.*;
 import de.maxhenkel.voicechat.api.events.*;
+import dev.omialien.voicechat_recording.voicechat.audio.AudioDirectoryReader;
+import dev.omialien.voicechat_recording.voicechat.events.AudioLoadedEvent;
+import dev.omialien.voicechat_recording.voicechat.events.AudioRecordedEvent;
+import net.minecraft.world.entity.player.Player;
+import net.neoforged.neoforge.common.NeoForge;
+import org.apache.commons.io.FilenameUtils;
 
+import javax.annotation.Nullable;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -30,8 +40,13 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin {
      */
     @Override
     public void initialize(VoicechatApi api) {
-        VoiceChatRecording.LOGGER.debug("Revervox voice chat plugin initialized!");
+        VoiceChatRecording.LOGGER.info("Voice chat recording plugin initialized!");
         VoiceChatRecording.vcApi = api;
+        if(api instanceof VoicechatServerApi){
+            VoiceChatRecording.LOGGER.info("Server API");
+        } else {
+            VoiceChatRecording.LOGGER.info("Client API");
+        }
         categories = new LinkedList<>();
     }
 
@@ -48,6 +63,8 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin {
         registration.registerEvent(PlayerDisconnectedEvent.class, this::onPlayerDisconnected, 100);
     }
 
+
+
     private void onMicrophonePacket(MicrophonePacketEvent e){
         if (e.getSenderConnection() != null){ // If it's a player and not an entity
             RecordedPlayer recordedPlayer = recordedPlayers.get(e.getSenderConnection().getPlayer().getUuid());
@@ -59,11 +76,35 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin {
         UUID playerUuid = e.getConnection().getPlayer().getUuid();
         RecordedPlayer player = new RecordedPlayer(playerUuid);
         recordedPlayers.put(playerUuid, player);
-        player.loadAudios();
+        Path userPath = RecordedAudio.audiosPath.resolve(playerUuid.toString());
+        if(Files.exists(userPath)){
+            VoiceChatRecording.LOGGER.info("Loading audios for {}", e.getConnection().getPlayer().getPlayer().toString());
+            new AudioDirectoryReader(userPath, true, (audio, path) -> {
+                UUID id = UUID.fromString(FilenameUtils.getBaseName(path.getFileName().toString()));
+                VoiceChatRecording.LOGGER.debug("str -> UUID: {} vs {}",FilenameUtils.getBaseName(path.getFileName().toString()), id);
+                NeoForge.EVENT_BUS.post(new AudioLoadedEvent(new RecordedAudio(audio, playerUuid, id)));
+            },
+            (name) -> {
+                boolean f=name.getFileName().toString().endsWith(".pcm");
+                if(!f){
+                    VoiceChatRecording.LOGGER.error("Unkown file in audio folder ext: {}", name);
+                    return false;
+                }
+                try{
+                    String n = FilenameUtils.getBaseName(name.getFileName().toString());
+                    VoiceChatRecording.LOGGER.debug("File basename: {}", n);
+                    UUID id = UUID.fromString(n);
+                    return true;
+                } catch(IllegalArgumentException ex){
+                    VoiceChatRecording.LOGGER.error("Unkown file in audio folder uuid: {}", name);
+                    return false;
+                }
+            }).start();
+        }
         startRecording(playerUuid);
     }
 
-    public static void addCategory(String id, String name, String description, int[][] icon, VoicechatServerApi api){
+    public static void addCategory(String id, String name, String description, @Nullable int[][] icon, VoicechatServerApi api){
             categories.add(api.volumeCategoryBuilder()
                 .setId(id)
                 .setName(name)
@@ -74,7 +115,8 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin {
 
     private void onPlayerDisconnected(PlayerDisconnectedEvent e){
         stopRecording(e.getPlayerUuid());
-        recordedPlayers.get(e.getPlayerUuid()).saveAudios();
+        // TODO save audios
+        //recordedPlayers.get(e.getPlayerUuid()).saveAudios();
         recordedPlayers.remove(e.getPlayerUuid());
         privacyMode.remove(e.getPlayerUuid());
     }
@@ -93,8 +135,9 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin {
     }
 
     public static void stopRecording(UUID uuid) {
-        recordedPlayers.get(uuid).stopRecording();
+        recordedPlayers.get(uuid).saveCurrentRecording();
         VoiceChatRecording.LOGGER.debug("Stopped recording for player: " + uuid.toString());
+
     }
 
     public static void startRecording(UUID uuid) {
@@ -112,54 +155,10 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin {
 
 
     public static boolean getPrivacy(UUID uuid){
-        return privacyMode.getOrDefault(uuid, false);
+        return privacyMode.getOrDefault(uuid, true);
     }
     public static void setPrivacy(UUID uuid, boolean state){
         privacyMode.put(uuid, state);
-    }
-    public static short[] getAudio(UUID uuid, int idx, boolean remove){
-        if(recordedPlayers.get(uuid).getAudioCount() > idx){
-            return recordedPlayers.get(uuid).getAudio(idx, remove);
-        }
-        return null;
-    }
-    public static short[] getRandomAudio(UUID uuid, boolean remove){
-        return recordedPlayers.get(uuid).getRandomAudio(remove);
-    }
-    public static short[] getRandomAudio(boolean remove){
-        Random rnd = new Random();
-        List<RecordedPlayer> players = recordedPlayers.values()
-                .stream().filter((r) -> r.getAudioCount() > 0)
-                .toList();
-        if(players.isEmpty()){ return null; }
-        return players.get(rnd.nextInt(players.size())).getRandomAudio(remove);
-    }
-
-    public static int getAudioCount(){
-        return recordedPlayers.values().stream().map(RecordedPlayer::getAudioCount).reduce(0, Integer::sum);
-    }
-    // TODO atualmente todos os players têm a mesma chance de calhar para ser replaced, e não importa a quantidade de áudios que cada player tem
-    // um player com 199 audios e outro com 1 vão ter a mesma chance de ser escolhidos para dar replace a um dos seus áudios
-    public static void replaceRandomAudio(short[] audio){
-        List<RecordedPlayer> hasAudio = recordedPlayers.values().stream().filter((r) -> r.getAudioCount() > 0).toList();
-        VoiceChatRecording.LOGGER.debug("hasAudio: {}", hasAudio.size());
-        if(hasAudio.isEmpty()){
-            VoiceChatRecording.LOGGER.error("replaceRandomAudio called when no one has audios");
-            return;
-        }
-        hasAudio.get((new Random()).nextInt(hasAudio.size())).replaceRandomAudio(audio);
-    }
-
-    public static void addAudio(UUID uuid, short[] audio){
-        RecordedPlayer player = recordedPlayers.get(uuid);
-        if(player == null){
-            return;
-        }
-        if(getAudioCount() >= RecordingCommonConfig.RECORDING_LIMIT.get()){
-            replaceRandomAudio(audio);
-        } else {
-            player.addAudioDirect(audio);
-        }
     }
 
     private Runnable checkForSilence() {

@@ -5,7 +5,9 @@ import dev.omialien.voicechat_recording.VoiceChatRecording;
 import dev.omialien.voicechat_recording.commands.*;
 import dev.omialien.voicechat_recording.networking.PrivacyModePacket;
 import dev.omialien.voicechat_recording.networking.ServerPayloadHandler;
-import dev.omialien.voicechat_recording.voicechat.RecordedPlayer;
+import dev.omialien.voicechat_recording.voicechat.events.AudioLoadedEvent;
+import dev.omialien.voicechat_recording.voicechat.events.AudioRecordedEvent;
+import dev.omialien.voicechat_recording.voicechat.RecordedAudio;
 import dev.omialien.voicechat_recording.voicechat.VoiceChatRecordingPlugin;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
@@ -24,10 +26,10 @@ public class CommonEventBus {
     public static void onServerStarting(ServerStartingEvent event) {
         VoiceChatRecordingPlugin.addCategory(VoiceChatRecording.CATEGORY_ID, "Recording Plugin", "The volume of recorded voices", null, (VoicechatServerApi) VoiceChatRecording.vcApi);
         VoiceChatRecording.LOGGER.debug("Server starting");
-        RecordedPlayer.audiosPath = event.getServer().getWorldPath(VoiceChatRecording.AUDIO_DIRECTORY);
-        if(!Files.exists(RecordedPlayer.audiosPath)){
+        RecordedAudio.audiosPath = event.getServer().getWorldPath(VoiceChatRecording.AUDIO_DIRECTORY);
+        if(!Files.exists(RecordedAudio.audiosPath)){
             try {
-                Files.createDirectory(RecordedPlayer.audiosPath);
+                Files.createDirectory(RecordedAudio.audiosPath);
             } catch (IOException e) {
                 VoiceChatRecording.LOGGER.error("Error creating audios directory: " + e.getMessage());
             }
@@ -55,5 +57,15 @@ public class CommonEventBus {
                 PrivacyModePacket.STREAM_CODEC,
                 ServerPayloadHandler::handlePrivacy
         );
+    }
+
+    @SubscribeEvent
+    public static void onRecordedAudio(AudioRecordedEvent event){
+        VoiceChatRecording.LOGGER.debug("EVENT: Audio recorded! {}", event.getAudio().isFiltered());
+    }
+
+    @SubscribeEvent
+    public static void onLoadedAudio(AudioLoadedEvent event){
+        VoiceChatRecording.LOGGER.debug("EVENT: Audio loaded! {} {}", event.getAudio().getPlayerUUID(), event.getAudio().getId());
     }
 }
