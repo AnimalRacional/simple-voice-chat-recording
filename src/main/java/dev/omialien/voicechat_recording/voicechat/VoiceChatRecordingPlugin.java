@@ -40,11 +40,11 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin {
     @Override
     public void initialize(VoicechatApi api) {
         VoiceChatRecording.LOGGER.info("Voice chat recording plugin initialized!");
-        VoiceChatRecording.vcApi = api;
-        if(api instanceof VoicechatServerApi){
-            VoiceChatRecording.LOGGER.info("Server API");
+        if(api instanceof VoicechatServerApi napi){
+            VoiceChatRecording.LOGGER.info("Server Voice Chat API");
+            VoiceChatRecording.vcApi = napi;
         } else {
-            VoiceChatRecording.LOGGER.info("Client API");
+            VoiceChatRecording.LOGGER.info("Client Voice Chat API");
         }
         categories = new LinkedList<>();
     }

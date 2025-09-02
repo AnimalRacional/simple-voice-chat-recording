@@ -6,12 +6,10 @@ import com.mojang.brigadier.arguments.FloatArgumentType;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
-import de.maxhenkel.voicechat.api.VoicechatServerApi;
-import de.maxhenkel.voicechat.api.audiochannel.EntityAudioChannel;
 import dev.omialien.voicechat_recording.VoiceChatRecording;
 import dev.omialien.voicechat_recording.voicechat.RecordedAudio;
 import dev.omialien.voicechat_recording.voicechat.audio.AudioEffect;
-import dev.omialien.voicechat_recording.voicechat.audio.AudioPlayer;
+import dev.omialien.voicechat_recording.voicechat.util.AudioPlayingUtil;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.commands.SharedSuggestionProvider;
@@ -33,7 +31,7 @@ import java.util.UUID;
 
 public class NearestEntityPlayVoiceCommand {
     public static final int PERMISSION_LEVEL = 2;
-    private static final int CHANNEL_DISTANCE = 20;
+    private static final float CHANNEL_DISTANCE = 20;
     public static final int bbX = 5;
     public static final int bbY = 5;
     public static final int bbZ = 5;
@@ -55,6 +53,7 @@ public class NearestEntityPlayVoiceCommand {
                 Commands.argument("lfo-frequency", FloatArgumentType.floatArg()).executes(cmd)
         );
     }
+    // TODO adicionar argumento de localização em vez de entidade
     public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
         dispatcher.register(
                 Commands.literal("playVoice").requires((src) -> src.hasPermission(PERMISSION_LEVEL))
@@ -121,11 +120,8 @@ public class NearestEntityPlayVoiceCommand {
 
     private static void playAudio(CommandContext<CommandSourceStack> ctx,
                                   Entity entity, UUID id,
-                                  VoicechatServerApi api, AudioEffect effects){
+                                  AudioEffect effects){
         VoiceChatRecording.LOGGER.debug("Entity: " + entity.getName());
-        UUID channelID = UUID.randomUUID();
-        EntityAudioChannel channel = createChannel(api, channelID, VoiceChatRecording.CATEGORY_ID, entity);
-        VoiceChatRecording.LOGGER.debug("Created new channel: " + channel);
         RecordedAudio audio = null;
         for(RecordedAudio cur : VoiceChatRecording.storedAudios){
             if(cur.getId().equals(id)){
@@ -138,7 +134,7 @@ public class NearestEntityPlayVoiceCommand {
             String playerName = player == null ? audio.getPlayerUUID().toString() : player.getName().getString();
             ctx.getSource().sendSuccess(() ->
                     Component.literal("Playing audio of " + playerName + " from " + entity.getName()), true);
-            new AudioPlayer(audio.applyEffects(effects), api, channel).start();
+            AudioPlayingUtil.playFromEntity(audio, entity, effects, VoiceChatRecording.CATEGORY_ID, CHANNEL_DISTANCE);
         } else {
             ctx.getSource().sendFailure(Component.literal("Invalid ID " + id));
         }
@@ -148,39 +144,24 @@ public class NearestEntityPlayVoiceCommand {
                                  @Nullable Collection<? extends Entity> targets,
                                  UUID id, AudioEffect effects){
         try{
-            if(VoiceChatRecording.vcApi instanceof VoicechatServerApi api){
-                Collection<Entity> entities = targets == null ? null : targets.stream().map((e) -> (Entity)e).toList();
-                if(entities == null){
-                    // If no entities are specified, use the nearest entity
-                    LivingEntity nearestEntity = getNearestEntity(ctx);
-                    if(nearestEntity == null){
-                        ctx.getSource().sendFailure(Component.literal("No entity found!"));
-                        return 20;
-                    }
-                    entities = new ArrayList<>(); entities.add(nearestEntity);
+            Collection<Entity> entities = targets == null ? null : targets.stream().map((e) -> (Entity)e).toList();
+            if(entities == null){
+                // If no entities are specified, use the nearest entity
+                LivingEntity nearestEntity = getNearestEntity(ctx);
+                if(nearestEntity == null){
+                    ctx.getSource().sendFailure(Component.literal("No entity found!"));
+                    return 20;
                 }
-                for(Entity audioTarget : entities){
-                    // TODO quando remove é true, tocar em várias entidades vai remover vários audios
-                    playAudio(ctx, audioTarget, id, api, effects);
-                }
-                return 0;
+                entities = new ArrayList<>(); entities.add(nearestEntity);
             }
-            return 50;
+            for(Entity audioTarget : entities){
+                playAudio(ctx, audioTarget, id, effects);
+            }
+            return 0;
         } catch(Exception e){
             VoiceChatRecording.LOGGER.error("Error running playVoice: {}\r\n{}", e.getMessage(), e.getStackTrace());
             ctx.getSource().sendFailure(Component.literal(e.getMessage()));
             return 100;
         }
-    }
-
-    private static EntityAudioChannel createChannel(VoicechatServerApi api, UUID channelID, String category, Entity nearestEntity) {
-        EntityAudioChannel channel = api.createEntityAudioChannel(channelID, api.fromEntity(nearestEntity));
-        if (channel == null) {
-            VoiceChatRecording.LOGGER.error("Couldn't create channel");
-            return null;
-        }
-        channel.setCategory(category); // The category of the audio channel
-        channel.setDistance(NearestEntityPlayVoiceCommand.CHANNEL_DISTANCE); // The distance in which the audio channel can be heard
-        return channel;
     }
 }

@@ -1,7 +1,7 @@
 package dev.omialien.voicechat_recording;
 
 import com.mojang.logging.LogUtils;
-import de.maxhenkel.voicechat.api.VoicechatApi;
+import de.maxhenkel.voicechat.api.VoicechatServerApi;
 import dev.omialien.voicechat_recording.configs.RecordingClientConfig;
 import dev.omialien.voicechat_recording.configs.RecordingCommonConfig;
 import dev.omialien.voicechat_recording.taskscheduler.TaskScheduler;
@@ -19,7 +19,7 @@ import java.util.List;
 // The value here should match an entry in the META-INF/neoforge.mods.toml file
 @Mod(VoiceChatRecording.MOD_ID)
 public class VoiceChatRecording {
-    public static VoicechatApi vcApi;
+    public static VoicechatServerApi vcApi;
     public static TaskScheduler TASKS;
     // Define mod id in a common place for everything to reference
     public static final String MOD_ID = "voicechatrecording";
