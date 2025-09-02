@@ -5,6 +5,7 @@ import de.maxhenkel.voicechat.api.events.*;
 import dev.omialien.voicechat_recording.VoiceChatRecording;
 import dev.omialien.voicechat_recording.voicechat.audio.AudioDirectoryReader;
 import dev.omialien.voicechat_recording.voicechat.events.AudioLoadedEvent;
+import dev.omialien.voicechat_recording.voicechat.events.MicPacketReceivedEvent;
 import net.neoforged.neoforge.common.NeoForge;
 import org.apache.commons.io.FilenameUtils;
 
@@ -19,7 +20,6 @@ import java.util.concurrent.ConcurrentHashMap;
 
 @ForgeVoicechatPlugin
 public class VoiceChatRecordingPlugin implements VoicechatPlugin {
-    public static final int SAMPLE_RATE = 48000;
     private static Map<UUID, RecordedPlayer> recordedPlayers;
     private static Map<UUID, Boolean> privacyMode;
     private static Queue<VolumeCategory> categories;
@@ -68,6 +68,8 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin {
         if (e.getSenderConnection() != null){ // If it's a player and not an entity
             RecordedPlayer recordedPlayer = recordedPlayers.get(e.getSenderConnection().getPlayer().getUuid());
             recordedPlayer.recordPacket(e.getPacket().getOpusEncodedData());
+            MicPacketReceivedEvent ev = new MicPacketReceivedEvent(e);
+            NeoForge.EVENT_BUS.post(ev);
         }
     }
 
