@@ -21,7 +21,6 @@ public class RecordedAudio {
     private final short[] audio;
     private final UUID id;
     private final UUID player;
-    private final FilterInfo filtered;
     private boolean saved;
     public RecordedAudio(short[] audio, UUID player){
         this(audio, player, UUID.randomUUID());
@@ -32,11 +31,6 @@ public class RecordedAudio {
         this.player = player;
         this.id = id;
         this.saved = false;
-        this.filtered = filterAudio();
-    }
-
-    public FilterInfo getFilterInfo(){
-        return this.filtered;
     }
 
     /**
@@ -103,27 +97,46 @@ public class RecordedAudio {
         NO_ACTIVE_AUDIO,
         LOW_RMS
     }
-    public record FilterInfo(double duration, int activeSamples, double rms) {
-        public FilterResult getResult(){
-            final double MIN_DURATION = 0.9;
-            final double MAX_DURATION = 10;
-            final double MIN_RMS = 500;      // loudness threshold
-            if(duration <= MIN_DURATION){
-                return FilterResult.TOO_SHORT;
-            }
-            if(duration > MAX_DURATION){
-                return FilterResult.TOO_LONG;
-            }
-            if(activeSamples <= 0){
-                return FilterResult.NO_ACTIVE_AUDIO;
-            }
-            return rms >= MIN_RMS ? FilterResult.PASSED : FilterResult.LOW_RMS;
+
+    public FilterResult getFilterResult(){
+        final double MIN_DURATION = 0.9;
+        final double MAX_DURATION = 10;
+        final double MIN_RMS = 500;      // loudness threshold
+        double duration = getDuration();
+        if(duration <= MIN_DURATION){
+            return FilterResult.TOO_SHORT;
         }
+        if(duration > MAX_DURATION){
+            return FilterResult.TOO_LONG;
+        }
+        if(getActiveSamples() <= 0){
+            return FilterResult.NO_ACTIVE_AUDIO;
+        }
+        return getRms() >= MIN_RMS ? FilterResult.PASSED : FilterResult.LOW_RMS;
     }
 
-    private FilterInfo filterAudio() {
-        double durationSeconds = (double) audio.length / SAMPLE_RATE;
+    public double getDuration(){
+        return (double) audio.length / SAMPLE_RATE;
+    }
 
+    public double getActiveDuration(){
+        return (double) getActiveSamples() / SAMPLE_RATE;
+    }
+
+    public String getAudioInfo(){
+        return (String.format(
+                "Audio duration: %.3fs, Active region: %.3fs, RMS: %.1f",
+                getDuration(),
+                (double) getActiveSamples() / SAMPLE_RATE,
+                getRms()
+        ));
+    }
+
+    private int activeSamplesCache;
+    private double rmsCache;
+    private boolean calculatedCaches = false;
+    private void calculateCaches(){
+        calculatedCaches = true;
         int start = 0;
         while (start < audio.length &&
                 Math.abs(audio[start]) < RecordingCommonConfig.SILENCE_THRESHOLD.get()) {
@@ -144,16 +157,18 @@ public class RecordedAudio {
             int sample = audio[i];
             sumSquares += sample * sample;
         }
-        double rms = Math.sqrt(sumSquares / (double) activeSamples);
+        this.rmsCache = Math.sqrt(sumSquares / (double) activeSamples);
+        this.activeSamplesCache = activeSamples;
+    }
 
-        VoiceChatRecording.LOGGER.debug(String.format(
-                "Audio duration: %.3fs, Active region: %.3fs, RMS: %.1f",
-                durationSeconds,
-                (double) activeSamples / SAMPLE_RATE,
-                rms
-        ));
+    public int getActiveSamples(){
+        if(!calculatedCaches){ calculateCaches(); }
+        return this.activeSamplesCache;
+    }
 
-        return new FilterInfo(durationSeconds, activeSamples, rms);
+    public double getRms(){
+        if(!calculatedCaches){ calculateCaches(); }
+        return this.rmsCache;
     }
 
     @Override

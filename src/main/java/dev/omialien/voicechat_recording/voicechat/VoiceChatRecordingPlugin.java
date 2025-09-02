@@ -96,6 +96,8 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin {
                             return false;
                         }
                     }).start();
+        } else {
+            VoiceChatRecording.LOGGER.debug("No audios found for {}", playerUuid);
         }
     }
 

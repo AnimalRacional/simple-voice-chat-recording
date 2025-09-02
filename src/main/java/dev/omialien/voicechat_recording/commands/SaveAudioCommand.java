@@ -5,6 +5,7 @@ import dev.omialien.voicechat_recording.VoiceChatRecording;
 import dev.omialien.voicechat_recording.voicechat.RecordedAudio;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
+import net.minecraft.commands.SharedSuggestionProvider;
 import net.minecraft.commands.arguments.UuidArgument;
 import net.minecraft.network.chat.Component;
 
@@ -15,7 +16,11 @@ public class SaveAudioCommand {
     public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
         dispatcher.register(Commands.literal("saveAudio").
                 requires((src) -> src.hasPermission(PERMISSION_LEVEL))
-                .then(Commands.argument("audio", UuidArgument.uuid()).executes((src) -> {
+                .then(Commands.argument("audio", UuidArgument.uuid())
+                        .suggests((src, suggestionsBuilder) ->
+                                SharedSuggestionProvider.suggest(
+                                        VoiceChatRecording.storedAudios.stream().map((r) -> r.getId().toString()), suggestionsBuilder))
+                        .executes((src) -> {
             UUID id = UuidArgument.getUuid(src, "audio");
             RecordedAudio res = null;
             for(RecordedAudio cur : VoiceChatRecording.storedAudios){

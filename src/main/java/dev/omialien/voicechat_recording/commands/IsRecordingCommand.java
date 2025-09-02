@@ -13,7 +13,7 @@ import net.minecraft.server.players.PlayerList;
 
 import java.util.Collection;
 
-public class isRecordingCommand {
+public class IsRecordingCommand {
     public static final int PERMISSION_LEVEL = 2;
     public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
         dispatcher.register(Commands.literal("isRecording").requires((cmdSrc) -> cmdSrc.hasPermission(PERMISSION_LEVEL)).then(Commands.argument("targets", GameProfileArgument.gameProfile()).suggests((cmdSrc, suggestionsBuilder) -> {

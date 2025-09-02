@@ -40,11 +40,12 @@ public class CommonEventBus {
         NearestEntityPlayVoiceCommand.register(event.getDispatcher());
         StartRecordingCommand.register(event.getDispatcher());
         SaveCurrentRecordingCommand.register(event.getDispatcher());
-        isRecordingCommand.register(event.getDispatcher());
+        IsRecordingCommand.register(event.getDispatcher());
         ScheduleLogCommand.register(event.getDispatcher());
         RememberAudiosCommand.register(event.getDispatcher());
         ListAudiosCommand.register(event.getDispatcher());
         SaveAudioCommand.register(event.getDispatcher());
+        AudioInfoCommand.register(event.getDispatcher());
     }
 
     @SubscribeEvent
@@ -65,8 +66,9 @@ public class CommonEventBus {
     @SubscribeEvent
     public static void onRecordedAudio(AudioRecordedEvent event){
         RecordedAudio audio = event.getAudio();
-        VoiceChatRecording.LOGGER.debug("EVENT: Audio recorded! Filter result: {}", audio.getFilterInfo().getResult());
-        if(RememberAudiosCommand.shouldRemember && audio.getFilterInfo().getResult() == RecordedAudio.FilterResult.PASSED){
+
+        if(RememberAudiosCommand.shouldRemember && audio.getFilterResult() == RecordedAudio.FilterResult.PASSED){
+            VoiceChatRecording.LOGGER.debug("EVENT: Audio recorded! Filter result: {}", audio.getFilterResult());
             VoiceChatRecording.storedAudios.add(audio);
         }
     }
