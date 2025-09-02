@@ -79,7 +79,7 @@ public class NearestEntityPlayVoiceCommand {
                                     return runCommand(
                                             ctx, EntityArgument.getEntities(ctx, "entity"),
                                             UuidArgument.getUuid(ctx, "uuid"),
-                                            new AudioEffect().changePitch(FloatArgumentType.getFloat(ctx, "pitchFactor"))
+                                            AudioEffect.pitch(FloatArgumentType.getFloat(ctx, "pitchFactor"))
                                     );
                                 })).then(REVERB_ARG((ctx) -> {
                                     VoiceChatRecording.LOGGER.debug("ent id reverb");
@@ -89,7 +89,7 @@ public class NearestEntityPlayVoiceCommand {
                                     return runCommand(
                                             ctx, EntityArgument.getEntities(ctx, "entity"),
                                             UuidArgument.getUuid(ctx, "uuid"),
-                                            new AudioEffect().makeReverb(decay, delay, repeats)
+                                            AudioEffect.reverb(decay, delay, repeats)
                                     );
                                         })
                                 ).then(ROBOT_ARG((ctx) -> {
@@ -97,7 +97,15 @@ public class NearestEntityPlayVoiceCommand {
                                     return runCommand(
                                             ctx, EntityArgument.getEntities(ctx, "entity"),
                                             UuidArgument.getUuid(ctx, "uuid"),
-                                            new AudioEffect().makeRobot(FloatArgumentType.getFloat(ctx, "lfo-frequency"))
+                                            AudioEffect.robot(FloatArgumentType.getFloat(ctx, "lfo-frequency"))
+                                    );
+                                }))
+                                .then(Commands.literal("random").executes((ctx) -> {
+                                    VoiceChatRecording.LOGGER.debug("ent id random");
+                                    return runCommand(
+                                            ctx, EntityArgument.getEntities(ctx, "entity"),
+                                            UuidArgument.getUuid(ctx, "uuid"),
+                                            AudioEffect.random()
                                     );
                                 })))));
     }
