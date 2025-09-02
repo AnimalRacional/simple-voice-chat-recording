@@ -49,7 +49,6 @@ public class RecordedPlayer {
                     boolean active = false;
                     for (short value : decodedPacket) {
                         if (Math.abs(value) >= RecordingCommonConfig.SILENCE_THRESHOLD.get()) {
-                            VoiceChatRecording.LOGGER.debug("Active packet: {} {}", decodedPacket.length, decodedPacket[50]);
                             setLastSpoke(System.currentTimeMillis());
                             setSilent(false);
                             active = true;

@@ -11,15 +11,17 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
+import java.util.Objects;
 import java.util.UUID;
 
 public class RecordedAudio {
     // TODO find a way to prevent or discourage modifying this
+    public final int SAMPLE_RATE = 48000;
     public static Path audiosPath;
     private final short[] audio;
     private final UUID id;
     private final UUID player;
-    private final FilterResult filtered;
+    private final FilterInfo filtered;
     private boolean saved;
     public RecordedAudio(short[] audio, UUID player){
         this(audio, player, UUID.randomUUID());
@@ -33,7 +35,7 @@ public class RecordedAudio {
         this.filtered = filterAudio();
     }
 
-    public FilterResult getFilterResult(){
+    public FilterInfo getFilterInfo(){
         return this.filtered;
     }
 
@@ -54,6 +56,10 @@ public class RecordedAudio {
 
     public UUID getId(){
         return this.id;
+    }
+
+    public boolean wasSaved(){
+        return this.saved;
     }
 
     public void saveAudio(){
@@ -94,25 +100,29 @@ public class RecordedAudio {
         PASSED,
         TOO_LONG,
         TOO_SHORT,
-        BELOW_THRESHOLD,
+        NO_ACTIVE_AUDIO,
         LOW_RMS
     }
+    public record FilterInfo(double duration, int activeSamples, double rms) {
+        public FilterResult getResult(){
+            final double MIN_DURATION = 0.9;
+            final double MAX_DURATION = 10;
+            final double MIN_RMS = 500;      // loudness threshold
+            if(duration <= MIN_DURATION){
+                return FilterResult.TOO_SHORT;
+            }
+            if(duration > MAX_DURATION){
+                return FilterResult.TOO_LONG;
+            }
+            if(activeSamples <= 0){
+                return FilterResult.NO_ACTIVE_AUDIO;
+            }
+            return rms >= MIN_RMS ? FilterResult.PASSED : FilterResult.LOW_RMS;
+        }
+    }
 
-    private FilterResult filterAudio() {
-        final int SAMPLE_RATE = 48000;
-        final double MIN_DURATION = 0.9;
-        final double MAX_DURATION = 10;
-        final double MIN_RMS = 500;      // loudness threshold
-
+    private FilterInfo filterAudio() {
         double durationSeconds = (double) audio.length / SAMPLE_RATE;
-        if (durationSeconds <= MIN_DURATION) {
-            VoiceChatRecording.LOGGER.debug("Audio too short: " + durationSeconds + "s");
-            return FilterResult.TOO_SHORT;
-        }
-        if (durationSeconds > MAX_DURATION) {
-            VoiceChatRecording.LOGGER.debug("Audio too long: " + durationSeconds + "s");
-            return FilterResult.TOO_LONG;
-        }
 
         int start = 0;
         while (start < audio.length &&
@@ -127,10 +137,6 @@ public class RecordedAudio {
         }
 
         int activeSamples = end - start + 1;
-        if (activeSamples <= 0) {
-            VoiceChatRecording.LOGGER.debug("No active audio found above silence threshold");
-            return FilterResult.BELOW_THRESHOLD;
-        }
 
         // RMS on trimmed region
         long sumSquares = 0;
@@ -147,6 +153,18 @@ public class RecordedAudio {
                 rms
         ));
 
-        return rms >= MIN_RMS ? FilterResult.PASSED : FilterResult.LOW_RMS;
+        return new FilterInfo(durationSeconds, activeSamples, rms);
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        if(obj instanceof RecordedAudio other){
+            return other.getId().equals(this.getId()) && other.getPlayerUUID().equals(this.getPlayerUUID());
+        } else { return super.equals(obj); }
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(this.getId(), this.getPlayerUUID());
     }
 }
