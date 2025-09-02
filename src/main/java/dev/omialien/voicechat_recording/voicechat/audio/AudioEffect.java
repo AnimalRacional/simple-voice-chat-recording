@@ -22,10 +22,18 @@ public class AudioEffect {
         this.reverbEnabled = false;
     }
 
+    public static AudioEffect pitch(float pitchFactor){
+        return new AudioEffect().changePitch(pitchFactor);
+    }
+
     public AudioEffect changePitch(float pitchFactor) {
         this.pitchFactor = pitchFactor;
         this.pitchEnabled = true;
         return this;
+    }
+
+    public static AudioEffect reverb(float decay, int delayMs, int repeats){
+        return new AudioEffect().makeReverb(decay, delayMs, repeats);
     }
 
     public AudioEffect makeReverb(float decay, int delayMs, int repeats) {
@@ -36,10 +44,18 @@ public class AudioEffect {
         return this;
     }
 
+    public static AudioEffect robot(float lfoFreqhz){
+        return new AudioEffect().makeRobot(lfoFreqhz);
+    }
+
     public AudioEffect makeRobot(float lfoFreqHz) {
         this.robotEnabled = true;
         this.robotLfoFreq = lfoFreqHz;
         return this;
+    }
+
+    public static AudioEffect random(){
+        return new AudioEffect().addRandomEffects();
     }
 
     public AudioEffect addRandomEffects() {
@@ -81,7 +97,7 @@ public class AudioEffect {
         return pcm;
     }
 
-    public static short[] changePitch(short[] pcm, float pitchFactor) {
+    private static short[] changePitch(short[] pcm, float pitchFactor) {
         if (pitchFactor <= 0) throw new IllegalArgumentException("Pitch factor must be > 0");
 
         int newLength = (int)(pcm.length / pitchFactor);
@@ -102,7 +118,7 @@ public class AudioEffect {
         return result;
     }
 
-    public static short[] addReverb(short[] input, float decay, int delayMs, int repeats) {
+    private static short[] addReverb(short[] input, float decay, int delayMs, int repeats) {
         if (decay <= 0 || decay >= 1) throw new IllegalArgumentException("Decay must be between 0 and 1");
         if (delayMs <= 0 || repeats <= 0) throw new IllegalArgumentException("Delay and repeats must be > 0");
 
@@ -128,7 +144,7 @@ public class AudioEffect {
         return output;
     }
 
-    public static short[] robotize(short[] pcm, float lfoFreqHz) {
+    private static short[] robotize(short[] pcm, float lfoFreqHz) {
         if (lfoFreqHz <= 0) throw new IllegalArgumentException("LFO frequency must be > 0");
 
         short[] output = new short[pcm.length];
