@@ -139,7 +139,7 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin {
         recordedPlayers = new ConcurrentHashMap<>();
         privacyMode = new ConcurrentHashMap<>();
         VoiceChatRecording.LOGGER.debug("STARTING SCHEDULER");
-        VoiceChatRecording.TASKS.schedule(checkForSilence(), 20);
+        VoiceChatRecording.TASKS.schedule(VoiceChatRecordingPlugin::checkForSilence, 20);
     }
 
     public static void stopRecording(UUID uuid) {
@@ -153,14 +153,13 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin {
         VoiceChatRecording.LOGGER.debug("Recording started for player: " + uuid.toString());
     }
 
-    public static RecordedPlayer getRecordedPlayer(UUID uuid) {
+    public static IRecordedPlayer getRecordedPlayer(UUID uuid) {
         return recordedPlayers.get(uuid);
     }
 
-    public static Map<UUID, RecordedPlayer> getRecordedPlayers() {
+    private static Map<UUID, RecordedPlayer> getRecordedPlayers() {
         return recordedPlayers;
     }
-
 
     public static boolean getPrivacy(UUID uuid){
         return privacyMode.getOrDefault(uuid, true);
@@ -169,18 +168,14 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin {
         privacyMode.put(uuid, state);
     }
 
-    private Runnable checkForSilence() {
-        return () -> {
-            for (RecordedPlayer player : VoiceChatRecordingPlugin.getRecordedPlayers().values()) {
-                if(player.isSpeaking()) continue;
-                if (player.isSilent()) continue;
-                VoiceChatRecording.LOGGER.debug("Stopped Speaking!");
-                VoiceChatRecordingPlugin.stopRecording(player.getUuid());
-                player.setSilent(true);
-            }
-            VoiceChatRecording.TASKS.schedule(checkForSilence(), 25);
-        };
+    private static void checkForSilence() {
+        for (RecordedPlayer player : VoiceChatRecordingPlugin.getRecordedPlayers().values()) {
+            if(player.isSpeaking()) continue;
+            if (player.isSilent()) continue;
+            VoiceChatRecording.LOGGER.debug("Stopped Speaking!");
+            VoiceChatRecordingPlugin.stopRecording(player.getUuid());
+            player.setSilent(true);
+        }
+        VoiceChatRecording.TASKS.schedule(VoiceChatRecordingPlugin::checkForSilence, 25);
     }
-
-
 }

@@ -8,7 +8,7 @@ import net.neoforged.neoforge.common.NeoForge;
 
 import java.util.UUID;
 
-public class RecordedPlayer {
+public class RecordedPlayer implements IRecordedPlayer {
     public static final int RECORDING_SIZE = 1024*1024;
     private OpusDecoder decoder = null;
     private final short[] recording;
@@ -96,7 +96,7 @@ public class RecordedPlayer {
         return lastSpoke;
     }
 
-    public void setLastSpoke(long lastSpoke) {
+    private void setLastSpoke(long lastSpoke) {
         this.lastSpoke = lastSpoke;
     }
 
