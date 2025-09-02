@@ -1,28 +1,30 @@
 package dev.omialien.voicechat_recording.commands;
 
-import dev.omialien.voicechat_recording.VoiceChatRecording;
-import dev.omialien.voicechat_recording.voicechat.VoiceChatRecordingPlugin;
-import dev.omialien.voicechat_recording.voicechat.audio.AudioPlayer;
-import com.mojang.authlib.GameProfile;
+import com.mojang.brigadier.Command;
 import com.mojang.brigadier.CommandDispatcher;
-import com.mojang.brigadier.arguments.BoolArgumentType;
+import com.mojang.brigadier.arguments.FloatArgumentType;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
-import com.mojang.brigadier.builder.RequiredArgumentBuilder;
+import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
 import de.maxhenkel.voicechat.api.VoicechatServerApi;
 import de.maxhenkel.voicechat.api.audiochannel.EntityAudioChannel;
+import dev.omialien.voicechat_recording.VoiceChatRecording;
+import dev.omialien.voicechat_recording.voicechat.RecordedAudio;
+import dev.omialien.voicechat_recording.voicechat.audio.AudioEffect;
+import dev.omialien.voicechat_recording.voicechat.audio.AudioPlayer;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
+import net.minecraft.commands.SharedSuggestionProvider;
 import net.minecraft.commands.arguments.EntityArgument;
-import net.minecraft.commands.arguments.GameProfileArgument;
+import net.minecraft.commands.arguments.UuidArgument;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.targeting.TargetingConditions;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
-import org.jetbrains.annotations.NotNull;
 
 import javax.annotation.Nullable;
 import java.util.ArrayList;
@@ -36,56 +38,68 @@ public class NearestEntityPlayVoiceCommand {
     public static final int bbY = 5;
     public static final int bbZ = 5;
 
+    private static LiteralArgumentBuilder<CommandSourceStack> PITCH_ARG(Command<CommandSourceStack> cmd){
+        return Commands.literal("pitch").then(Commands.argument("pitchFactor", FloatArgumentType.floatArg()).executes(cmd));
+    }
+    private static LiteralArgumentBuilder<CommandSourceStack> REVERB_ARG(Command<CommandSourceStack> cmd){
+        return Commands.literal("reverb").then(
+                Commands.argument("decay", FloatArgumentType.floatArg()).then(
+                        Commands.argument("delay-ms", IntegerArgumentType.integer()).then(
+                                Commands.argument("repeats", IntegerArgumentType.integer()).executes(cmd)
+                        ))
+        );
+    }
+
+    private static LiteralArgumentBuilder<CommandSourceStack> ROBOT_ARG(Command<CommandSourceStack> cmd){
+        return Commands.literal("robot").then(
+                Commands.argument("lfo-frequency", FloatArgumentType.floatArg()).executes(cmd)
+        );
+    }
     public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
-        RequiredArgumentBuilder<CommandSourceStack, Boolean> removeArgument =
-                Commands.argument("remove", BoolArgumentType.bool());
         dispatcher.register(
                 Commands.literal("playVoice").requires((src) -> src.hasPermission(PERMISSION_LEVEL))
-                    .then(
-                        Commands.argument("players", GameProfileArgument.gameProfile())
-                                .then(Commands.argument("index", IntegerArgumentType.integer())
-                                        .executes((ctx) ->{
-                                            VoiceChatRecording.LOGGER.debug("pl ind");
-                                            return runCommand(ctx, null,
-                                                    GameProfileArgument.getGameProfiles(ctx, "players"),
-                                                    IntegerArgumentType.getInteger(ctx, "index"),
-                                                    false);
+                .then(Commands.argument("uuid", UuidArgument.uuid())
+                        .suggests((src, suggestionsBuilder) ->
+                            SharedSuggestionProvider.suggest(
+                                    VoiceChatRecording.storedAudios.stream().map((r) -> r.getId().toString()), suggestionsBuilder))
+                        .executes((ctx) ->{
+                            VoiceChatRecording.LOGGER.debug("id");
+                            return runCommand(ctx, null,
+                                    UuidArgument.getUuid(ctx, "uuid"), null);
+                        })
+                        .then(Commands.argument("entity", EntityArgument.entities())
+                                .executes((ctx) ->{
+                                    VoiceChatRecording.LOGGER.debug("ent id");
+                                    return runCommand(
+                                        ctx, EntityArgument.getEntities(ctx, "entity"),
+                                        UuidArgument.getUuid(ctx, "uuid"), null);
+                                })
+                                .then(PITCH_ARG((ctx) -> {
+                                    VoiceChatRecording.LOGGER.debug("ent id pitch");
+                                    return runCommand(
+                                            ctx, EntityArgument.getEntities(ctx, "entity"),
+                                            UuidArgument.getUuid(ctx, "uuid"),
+                                            new AudioEffect().changePitch(FloatArgumentType.getFloat(ctx, "pitchFactor"))
+                                    );
+                                })).then(REVERB_ARG((ctx) -> {
+                                    VoiceChatRecording.LOGGER.debug("ent id reverb");
+                                    float decay = FloatArgumentType.getFloat(ctx, "decay");
+                                    int delay = IntegerArgumentType.getInteger(ctx, "delay-ms");
+                                    int repeats = IntegerArgumentType.getInteger(ctx, "repeats");
+                                    return runCommand(
+                                            ctx, EntityArgument.getEntities(ctx, "entity"),
+                                            UuidArgument.getUuid(ctx, "uuid"),
+                                            new AudioEffect().makeReverb(decay, delay, repeats)
+                                    );
                                         })
-                                        .then(removeArgument
-                                                .executes((ctx) ->{
-                                                    VoiceChatRecording.LOGGER.debug("pl ind rem");
-                                                    try{
-                                                        return runCommand(
-                                                                ctx, null,
-                                                                GameProfileArgument.getGameProfiles(ctx, "players"),
-                                                                IntegerArgumentType.getInteger(ctx, "index"),
-                                                                BoolArgumentType.getBool(ctx, "remove")
-                                                        );
-                                                    } catch(Exception e){
-                                                        VoiceChatRecording.LOGGER.error("error command {}\n{}", e.getMessage(), e.getStackTrace());
-                                                    }
-                                                    return 999;
-                                                }))
-                                        .then(Commands.argument("entity", EntityArgument.entities())
-                                                .executes((ctx) ->{
-                                                    VoiceChatRecording.LOGGER.debug("ent plr ind");
-                                                    return runCommand(
-                                                        ctx, EntityArgument.getEntities(ctx, "entity"),
-                                                        GameProfileArgument.getGameProfiles(ctx, "players"),
-                                                        IntegerArgumentType.getInteger(ctx, "index"),
-                                                        false);
-                                                })
-                                                .then(removeArgument.executes((ctx) -> {
-                                                    VoiceChatRecording.LOGGER.debug("ent pl ind rem");
-                                                    return runCommand(
-                                                        ctx, EntityArgument.getEntities(ctx, "entity"),
-                                                        GameProfileArgument.getGameProfiles(ctx, "players"),
-                                                        IntegerArgumentType.getInteger(ctx, "index"),
-                                                        BoolArgumentType.getBool(ctx, "remove")
-                                                    );
-                                                })))
-                ))
-        );
+                                ).then(ROBOT_ARG((ctx) -> {
+                                    VoiceChatRecording.LOGGER.debug("ent id robot");
+                                    return runCommand(
+                                            ctx, EntityArgument.getEntities(ctx, "entity"),
+                                            UuidArgument.getUuid(ctx, "uuid"),
+                                            new AudioEffect().makeRobot(FloatArgumentType.getFloat(ctx, "lfo-frequency"))
+                                    );
+                                })))));
     }
 
     private static LivingEntity getNearestEntity(CommandContext<CommandSourceStack> ctx){
@@ -98,29 +112,33 @@ public class NearestEntityPlayVoiceCommand {
     }
 
     private static void playAudio(CommandContext<CommandSourceStack> ctx,
-                                  Entity entity, Collection<GameProfile> players, int index, boolean remove,
-                                  VoicechatServerApi api){
+                                  Entity entity, UUID id,
+                                  VoicechatServerApi api, AudioEffect effects){
         VoiceChatRecording.LOGGER.debug("Entity: " + entity.getName());
-        for (GameProfile player : players) {
-            UUID channelID = UUID.randomUUID();
-            EntityAudioChannel channel = createChannel(api, channelID, VoiceChatRecording.CATEGORY_ID, entity);
-            VoiceChatRecording.LOGGER.debug("Created new channel: " + channel);
-            // TODO commands
-            //short[] audio = VoiceChatRecordingPlugin.getAudio(player.getId(), index, remove);
-            short[] audio = null;
-            if(audio != null){
-                ctx.getSource().sendSuccess(() ->
-                        Component.literal("Playing audio from " + player.getName() + " index " + index + " from " + entity.getName()), true);
-                new AudioPlayer(audio, api, channel).start();
-            } else {
-                ctx.getSource().sendFailure(Component.literal("Invalid index " + index + " for player " + player.getName()));
+        UUID channelID = UUID.randomUUID();
+        EntityAudioChannel channel = createChannel(api, channelID, VoiceChatRecording.CATEGORY_ID, entity);
+        VoiceChatRecording.LOGGER.debug("Created new channel: " + channel);
+        RecordedAudio audio = null;
+        for(RecordedAudio cur : VoiceChatRecording.storedAudios){
+            if(cur.getId().equals(id)){
+                audio = cur;
+                break;
             }
+        }
+        if(audio != null){
+            Player player = entity.level().getPlayerByUUID(audio.getPlayerUUID());
+            String playerName = player == null ? audio.getPlayerUUID().toString() : player.getName().getString();
+            ctx.getSource().sendSuccess(() ->
+                    Component.literal("Playing audio of " + playerName + " from " + entity.getName()), true);
+            new AudioPlayer(audio.applyEffects(effects), api, channel).start();
+        } else {
+            ctx.getSource().sendFailure(Component.literal("Invalid ID " + id));
         }
     }
 
     public static int runCommand(CommandContext<CommandSourceStack> ctx,
                                  @Nullable Collection<? extends Entity> targets,
-                                 @NotNull Collection<GameProfile> players, int index, boolean remove){
+                                 UUID id, AudioEffect effects){
         try{
             if(VoiceChatRecording.vcApi instanceof VoicechatServerApi api){
                 Collection<Entity> entities = targets == null ? null : targets.stream().map((e) -> (Entity)e).toList();
@@ -135,13 +153,14 @@ public class NearestEntityPlayVoiceCommand {
                 }
                 for(Entity audioTarget : entities){
                     // TODO quando remove é true, tocar em várias entidades vai remover vários audios
-                    playAudio(ctx, audioTarget, players, index, remove, api);
+                    playAudio(ctx, audioTarget, id, api, effects);
                 }
                 return 0;
             }
             return 50;
         } catch(Exception e){
             VoiceChatRecording.LOGGER.error("Error running playVoice: {}\r\n{}", e.getMessage(), e.getStackTrace());
+            ctx.getSource().sendFailure(Component.literal(e.getMessage()));
             return 100;
         }
     }

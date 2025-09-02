@@ -6,7 +6,6 @@ import dev.omialien.voicechat_recording.configs.RecordingCommonConfig;
 import dev.omialien.voicechat_recording.voicechat.events.AudioRecordedEvent;
 import net.neoforged.neoforge.common.NeoForge;
 
-import java.nio.file.Path;
 import java.util.UUID;
 
 public class RecordedPlayer {
@@ -33,13 +32,6 @@ public class RecordedPlayer {
             System.arraycopy(recording, 0, savedRecording, 0, recordingSize);
             RecordedAudio recAudio = new RecordedAudio(savedRecording, this.getUuid());
             NeoForge.EVENT_BUS.post(new AudioRecordedEvent(recAudio));
-            if (recAudio.isFiltered()){
-                // TODO store audios
-                // VoiceChatRecordingPlugin.addAudio(uuid, savedRecording);
-                VoiceChatRecording.LOGGER.debug("Added audio to MEMORY for player: " + uuid.toString());
-            } else {
-                VoiceChatRecording.LOGGER.debug("Audio filtered, not storing");
-            }
             currentRecordingIndex = 0;
             recordingSize = 0;
         }
