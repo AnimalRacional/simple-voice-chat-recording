@@ -2,6 +2,7 @@ package dev.omialien.voicechat_recording.voicechat.audio;
 
 import dev.omialien.voicechat_recording.VoiceChatRecording;
 import dev.omialien.voicechat_recording.configs.RecordingCommonConfig;
+import org.jetbrains.annotations.ApiStatus;
 
 import java.io.*;
 import java.nio.file.DirectoryStream;
@@ -12,7 +13,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BiConsumer;
-import java.util.function.Consumer;
 import java.util.function.Predicate;
 
 public class AudioDirectoryReader extends Thread{
@@ -90,7 +90,9 @@ public class AudioDirectoryReader extends Thread{
             }
         }
     }
-    private short[] getFile(Path path){
+
+    @ApiStatus.Internal
+    public static short[] getFile(Path path){
         try {
             File file = path.toFile();
 

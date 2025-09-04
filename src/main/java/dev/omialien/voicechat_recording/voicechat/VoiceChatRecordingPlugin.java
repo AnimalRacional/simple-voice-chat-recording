@@ -16,13 +16,14 @@ import java.util.LinkedList;
 import java.util.Map;
 import java.util.Queue;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.*;
 
 @ForgeVoicechatPlugin
 public class VoiceChatRecordingPlugin implements VoicechatPlugin {
     private static Map<UUID, RecordedPlayer> recordedPlayers;
     private static Map<UUID, Boolean> privacyMode;
     private static Queue<VolumeCategory> categories;
+    private static ExecutorService audioLoader;
 
     /**
      * @return the unique ID for this voice chat plugin
@@ -39,6 +40,7 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin {
      */
     @Override
     public void initialize(VoicechatApi api) {
+        audioLoader = Executors.newFixedThreadPool(4);
         VoiceChatRecording.LOGGER.info("Voice chat recording plugin initialized!");
         if(api instanceof VoicechatServerApi napi){
             VoiceChatRecording.LOGGER.info("Server Voice Chat API");
@@ -62,8 +64,6 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin {
         registration.registerEvent(PlayerDisconnectedEvent.class, this::onPlayerDisconnected, 100);
     }
 
-
-
     private void onMicrophonePacket(MicrophonePacketEvent e){
         if (e.getSenderConnection() != null){ // If it's a player and not an entity
             RecordedPlayer recordedPlayer = recordedPlayers.get(e.getSenderConnection().getPlayer().getUuid());
@@ -73,7 +73,44 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin {
         }
     }
 
-    private void loadPlayerAudios(UUID playerUuid){
+    public Future<short[]> loadAudio(UUID playerUuid, UUID audioId){
+        Path audioPath = RecordedAudio.audiosPath.resolve(playerUuid.toString()).resolve(audioId.toString());
+        if(Files.exists(audioPath)){
+            VoiceChatRecording.LOGGER.debug("Loading audio {} from {}", audioId, playerUuid);
+            audioLoader.submit(() -> {
+                short[] audio = AudioDirectoryReader.getFile(audioPath);
+                if(audio != null){
+                    NeoForge.EVENT_BUS.post(new AudioLoadedEvent(new RecordedAudio(audio, playerUuid, audioId)));
+                    return audio;
+                } else {
+                    VoiceChatRecording.LOGGER.error("Error loading audio {} from {}", audioId, playerUuid);
+                    return null;
+                }
+            });
+        } else {
+            VoiceChatRecording.LOGGER.error("Tried to load nonexisting audio {} from {}", audioId, playerUuid);
+        }
+        return audioLoader.submit(() -> null);
+    }
+
+    public static void loadAudioToEvent(UUID playerUuid, UUID audioId){
+        Path audioPath = RecordedAudio.audiosPath.resolve(playerUuid.toString()).resolve(audioId.toString());
+        if(Files.exists(audioPath)){
+            VoiceChatRecording.LOGGER.debug("Loading audio {} from {}", audioId, playerUuid);
+            audioLoader.execute(() -> {
+                short[] audio = AudioDirectoryReader.getFile(audioPath);
+                if(audio != null){
+                    NeoForge.EVENT_BUS.post(new AudioLoadedEvent(new RecordedAudio(audio, playerUuid, audioId)));
+                } else {
+                    VoiceChatRecording.LOGGER.error("Error loading audio {} from {}", audioId, playerUuid);
+                }
+            });
+        } else {
+            VoiceChatRecording.LOGGER.error("Tried to load nonexisting audio {} from {}", audioId, playerUuid);
+        }
+    }
+
+    public static void loadPlayerAudios(UUID playerUuid){
         Path userPath = RecordedAudio.audiosPath.resolve(playerUuid.toString());
         if(Files.exists(userPath)){
             VoiceChatRecording.LOGGER.info("Loading audios for {}", playerUuid);
@@ -107,7 +144,7 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin {
         UUID playerUuid = e.getConnection().getPlayer().getUuid();
         RecordedPlayer player = new RecordedPlayer(playerUuid);
         recordedPlayers.put(playerUuid, player);
-        loadPlayerAudios(playerUuid);
+        //loadPlayerAudios(playerUuid);
         startRecording(playerUuid);
     }
 

@@ -5,6 +5,7 @@ import dev.omialien.voicechat_recording.VoiceChatRecording;
 import dev.omialien.voicechat_recording.commands.*;
 import dev.omialien.voicechat_recording.networking.PrivacyModePacket;
 import dev.omialien.voicechat_recording.networking.ServerPayloadHandler;
+import dev.omialien.voicechat_recording.voicechat.events.AudioEvent;
 import dev.omialien.voicechat_recording.voicechat.events.AudioLoadedEvent;
 import dev.omialien.voicechat_recording.voicechat.events.AudioRecordedEvent;
 import dev.omialien.voicechat_recording.voicechat.RecordedAudio;
@@ -39,7 +40,7 @@ public class CommonEventBus {
     public static void onRegisterCommands(RegisterCommandsEvent event) {
         NearestEntityPlayVoiceCommand.register(event.getDispatcher());
         StartRecordingCommand.register(event.getDispatcher());
-        SaveCurrentRecordingCommand.register(event.getDispatcher());
+        StopRecordingCommand.register(event.getDispatcher());
         IsRecordingCommand.register(event.getDispatcher());
         ScheduleLogCommand.register(event.getDispatcher());
         RememberAudiosCommand.register(event.getDispatcher());
@@ -76,5 +77,10 @@ public class CommonEventBus {
     @SubscribeEvent
     public static void onLoadedAudio(AudioLoadedEvent event){
         VoiceChatRecording.LOGGER.debug("EVENT: Audio loaded! {} {}", event.getAudio().getPlayerUUID(), event.getAudio().getId());
+    }
+
+    @SubscribeEvent
+    public static void onGenericAudio(AudioEvent event){
+        VoiceChatRecording.LOGGER.debug("GENERIC EVENT: audio happened {} {}", event.getAudio().getPlayerUUID(), event.getAudio().getId());
     }
 }
