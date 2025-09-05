@@ -3,6 +3,7 @@ package dev.omialien.voicechat_recording.voicechat;
 import dev.omialien.voicechat_recording.VoiceChatRecording;
 import dev.omialien.voicechat_recording.configs.RecordingCommonConfig;
 import dev.omialien.voicechat_recording.voicechat.audio.AudioEffect;
+import org.jetbrains.annotations.ApiStatus;
 
 import javax.annotation.Nullable;
 import java.io.DataOutputStream;
@@ -13,9 +14,13 @@ import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 public class RecordedAudio {
     // TODO find a way to prevent or discourage modifying this
+    private static final ExecutorService audioSaver = Executors.newFixedThreadPool(4);
     public final int SAMPLE_RATE = 48000;
     public static Path audiosPath;
     private final short[] audio;
@@ -31,6 +36,12 @@ public class RecordedAudio {
         this.player = player;
         this.id = id;
         this.saved = false;
+    }
+
+    @ApiStatus.Internal
+    public static boolean shutdown() throws InterruptedException {
+        audioSaver.shutdown();
+        return audioSaver.awaitTermination(60, TimeUnit.SECONDS);
     }
 
     /**
@@ -60,22 +71,24 @@ public class RecordedAudio {
         if(!VoiceChatRecordingPlugin.getPrivacy(this.player) && !saved){ // This method should only ever happen once per RecordedPlayer, no more no less
             saved = true;
             Path userPath = audiosPath.resolve(this.player.toString());
-            try{
-                if(!Files.exists(userPath)){
-                    Files.createDirectory(userPath);
+            audioSaver.execute(() -> {
+                try{
+                    if(!Files.exists(userPath)){
+                        Files.createDirectory(userPath);
+                    }
+                    Path filePath = userPath.resolve(getId() + ".pcm");
+                    Files.deleteIfExists(filePath);
+                    Files.createFile(filePath);
+                    DataOutputStream dos = new DataOutputStream(new FileOutputStream(filePath.toString()));
+                    for (Short cur : audio) {
+                        dos.writeShort(cur);
+                    }
+                    dos.close();
+                    VoiceChatRecording.LOGGER.info("Wrote recording to file {}", filePath);
+                } catch(IOException e){
+                    VoiceChatRecording.LOGGER.error("Error saving audios for {}:\r\n{}\r\n{}", getPlayerUUID(), e.getMessage(), e.getStackTrace());
                 }
-                Path filePath = userPath.resolve(getId() + ".pcm");
-                Files.deleteIfExists(filePath);
-                Files.createFile(filePath);
-                DataOutputStream dos = new DataOutputStream(new FileOutputStream(filePath.toString()));
-                for (Short cur : audio) {
-                    dos.writeShort(cur);
-                }
-                dos.close();
-                VoiceChatRecording.LOGGER.info("Wrote recording to file {}", filePath);
-            } catch(IOException e){
-                VoiceChatRecording.LOGGER.error("Error saving audios for {}:\r\n{}\r\n{}", getPlayerUUID(), e.getMessage(), e.getStackTrace());
-            }
+            });
         } else if(saved){
             VoiceChatRecording.LOGGER.warn("Tried to save already-saved audio! {} by {}", getId(), getPlayerUUID());
         }

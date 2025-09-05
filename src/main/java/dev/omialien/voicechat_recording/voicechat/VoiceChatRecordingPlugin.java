@@ -17,6 +17,7 @@ import java.util.Map;
 import java.util.Queue;
 import java.util.UUID;
 import java.util.concurrent.*;
+import java.util.function.Consumer;
 
 @ForgeVoicechatPlugin
 public class VoiceChatRecordingPlugin implements VoicechatPlugin {
@@ -73,15 +74,54 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin {
         }
     }
 
-    public Future<short[]> loadAudio(UUID playerUuid, UUID audioId){
+    public enum LoadType {
+        SINGLE,
+        ALL_FROM_USER
+    }
+
+    /**
+     * Loads an audio and gives it to a consumer
+     * @param playerUuid the uuid of the player to load the audio for
+     * @param audioId the uuid of the audio to load
+     * @param reaction the consumer to receive the loaded audio (or null)
+     */
+    public void loadAudio(UUID playerUuid, UUID audioId, Consumer<RecordedAudio> reaction){
         Path audioPath = RecordedAudio.audiosPath.resolve(playerUuid.toString()).resolve(audioId.toString());
         if(Files.exists(audioPath)){
             VoiceChatRecording.LOGGER.debug("Loading audio {} from {}", audioId, playerUuid);
             audioLoader.submit(() -> {
                 short[] audio = AudioDirectoryReader.getFile(audioPath);
                 if(audio != null){
-                    NeoForge.EVENT_BUS.post(new AudioLoadedEvent(new RecordedAudio(audio, playerUuid, audioId)));
-                    return audio;
+                    RecordedAudio recAudio = new RecordedAudio(audio, playerUuid, audioId);
+                    NeoForge.EVENT_BUS.post(new AudioLoadedEvent(recAudio, LoadType.SINGLE));
+                    reaction.accept(recAudio);
+                } else {
+                    VoiceChatRecording.LOGGER.error("Error loading audio {} from {}", audioId, playerUuid);
+                    reaction.accept(null);
+                }
+            });
+        } else {
+            VoiceChatRecording.LOGGER.error("Tried to load nonexisting audio {} from {}", audioId, playerUuid);
+        }
+        reaction.accept(null);
+    }
+
+    /**
+     * Loads an audio and returns a Future which will return the audio
+     * @param playerUuid the uuid of the player to load the audio for
+     * @param audioId the uuid of the audio to load
+     * @return A future which will return the loaded audio (or null)
+     */
+    public Future<RecordedAudio> loadAudio(UUID playerUuid, UUID audioId){
+        Path audioPath = RecordedAudio.audiosPath.resolve(playerUuid.toString()).resolve(audioId.toString());
+        if(Files.exists(audioPath)){
+            VoiceChatRecording.LOGGER.debug("Loading audio {} from {}", audioId, playerUuid);
+            return audioLoader.submit(() -> {
+                short[] audio = AudioDirectoryReader.getFile(audioPath);
+                if(audio != null){
+                    RecordedAudio recAudio = new RecordedAudio(audio, playerUuid, audioId);
+                    NeoForge.EVENT_BUS.post(new AudioLoadedEvent(recAudio, LoadType.SINGLE));
+                    return recAudio;
                 } else {
                     VoiceChatRecording.LOGGER.error("Error loading audio {} from {}", audioId, playerUuid);
                     return null;
@@ -100,7 +140,7 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin {
             audioLoader.execute(() -> {
                 short[] audio = AudioDirectoryReader.getFile(audioPath);
                 if(audio != null){
-                    NeoForge.EVENT_BUS.post(new AudioLoadedEvent(new RecordedAudio(audio, playerUuid, audioId)));
+                    NeoForge.EVENT_BUS.post(new AudioLoadedEvent(new RecordedAudio(audio, playerUuid, audioId), LoadType.SINGLE));
                 } else {
                     VoiceChatRecording.LOGGER.error("Error loading audio {} from {}", audioId, playerUuid);
                 }
@@ -117,12 +157,12 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin {
             new AudioDirectoryReader(userPath, true, (audio, path) -> {
                 UUID id = UUID.fromString(FilenameUtils.getBaseName(path.getFileName().toString()));
                 VoiceChatRecording.LOGGER.debug("str -> UUID: {} vs {}",FilenameUtils.getBaseName(path.getFileName().toString()), id);
-                NeoForge.EVENT_BUS.post(new AudioLoadedEvent(new RecordedAudio(audio, playerUuid, id)));
+                NeoForge.EVENT_BUS.post(new AudioLoadedEvent(new RecordedAudio(audio, playerUuid, id), LoadType.ALL_FROM_USER));
             },
                     (name) -> {
                         boolean f=name.getFileName().toString().endsWith(".pcm");
                         if(!f){
-                            VoiceChatRecording.LOGGER.error("Unknown file in audio folder ext: {}", name);
+                            VoiceChatRecording.LOGGER.error("Unknown file in audio folder (unknown extension): {}", name);
                             return false;
                         }
                         try{
@@ -131,12 +171,12 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin {
                             UUID id = UUID.fromString(n);
                             return true;
                         } catch(IllegalArgumentException ex){
-                            VoiceChatRecording.LOGGER.error("Unkown file in audio folder uuid: {}", name);
+                            VoiceChatRecording.LOGGER.error("Unknown file in audio folder (not uuid): {}", name);
                             return false;
                         }
                     }).start();
         } else {
-            VoiceChatRecording.LOGGER.debug("No audios found for {}", playerUuid);
+            VoiceChatRecording.LOGGER.warn("No audios found for {}", playerUuid);
         }
     }
 
@@ -144,12 +184,13 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin {
         UUID playerUuid = e.getConnection().getPlayer().getUuid();
         RecordedPlayer player = new RecordedPlayer(playerUuid);
         recordedPlayers.put(playerUuid, player);
-        //loadPlayerAudios(playerUuid);
+        // TODO disable loadPlayerAudios before releasing
+        loadPlayerAudios(playerUuid);
         startRecording(playerUuid);
     }
 
-    public static void addCategory(String id, String name, String description, @Nullable int[][] icon, VoicechatServerApi api){
-            categories.add(api.volumeCategoryBuilder()
+    public static void addCategory(String id, String name, String description, @Nullable int[][] icon){
+            categories.add(VoiceChatRecording.vcApi.volumeCategoryBuilder()
                 .setId(id)
                 .setName(name)
                 .setDescription(description)
@@ -172,6 +213,7 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin {
         for(VolumeCategory cat : categories){
             api.registerVolumeCategory(cat);
         }
+        categories.clear();
 
         recordedPlayers = new ConcurrentHashMap<>();
         privacyMode = new ConcurrentHashMap<>();

@@ -1,19 +1,20 @@
 package dev.omialien.voicechat_recording.events;
 
-import de.maxhenkel.voicechat.api.VoicechatServerApi;
 import dev.omialien.voicechat_recording.VoiceChatRecording;
 import dev.omialien.voicechat_recording.commands.*;
 import dev.omialien.voicechat_recording.networking.PrivacyModePacket;
 import dev.omialien.voicechat_recording.networking.ServerPayloadHandler;
+import dev.omialien.voicechat_recording.voicechat.RecordedAudio;
+import dev.omialien.voicechat_recording.voicechat.VoiceChatRecordingPlugin;
 import dev.omialien.voicechat_recording.voicechat.events.AudioEvent;
 import dev.omialien.voicechat_recording.voicechat.events.AudioLoadedEvent;
 import dev.omialien.voicechat_recording.voicechat.events.AudioRecordedEvent;
-import dev.omialien.voicechat_recording.voicechat.RecordedAudio;
-import dev.omialien.voicechat_recording.voicechat.VoiceChatRecordingPlugin;
+import net.neoforged.bus.api.EventPriority;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
 import net.neoforged.neoforge.event.server.ServerStartingEvent;
+import net.neoforged.neoforge.event.server.ServerStoppedEvent;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 import net.neoforged.neoforge.network.registration.PayloadRegistrar;
@@ -25,7 +26,7 @@ import java.nio.file.Files;
 public class CommonEventBus {
     @SubscribeEvent
     public static void onServerStarting(ServerStartingEvent event) {
-        VoiceChatRecordingPlugin.addCategory(VoiceChatRecording.CATEGORY_ID, "Recording Plugin", "The volume of recorded voices", null, (VoicechatServerApi) VoiceChatRecording.vcApi);
+        VoiceChatRecordingPlugin.addCategory(VoiceChatRecording.CATEGORY_ID, "Recording Plugin", "The volume of recorded voices", null);
         VoiceChatRecording.LOGGER.debug("Server starting");
         RecordedAudio.audiosPath = event.getServer().getWorldPath(VoiceChatRecording.AUDIO_DIRECTORY);
         if(!Files.exists(RecordedAudio.audiosPath)){
@@ -36,6 +37,21 @@ public class CommonEventBus {
             }
         }
     }
+
+    @SubscribeEvent(priority = EventPriority.LOWEST)
+    public static void onServerClosed(ServerStoppedEvent event){
+        try{
+            // TODO maybe remove this saveaudio loop?
+            for(RecordedAudio audio : VoiceChatRecording.storedAudios){
+                audio.saveAudio();
+            }
+            VoiceChatRecording.LOGGER.info("Shutting down audio saving...");
+            RecordedAudio.shutdown();
+        } catch(InterruptedException e){
+            VoiceChatRecording.LOGGER.error("Audio saving shutdown interrupted! {}\n{}", e.getMessage(), e.getStackTrace());
+        }
+    }
+
     @SubscribeEvent
     public static void onRegisterCommands(RegisterCommandsEvent event) {
         NearestEntityPlayVoiceCommand.register(event.getDispatcher());
@@ -77,6 +93,11 @@ public class CommonEventBus {
     @SubscribeEvent
     public static void onLoadedAudio(AudioLoadedEvent event){
         VoiceChatRecording.LOGGER.debug("EVENT: Audio loaded! {} {}", event.getAudio().getPlayerUUID(), event.getAudio().getId());
+        // TODO add shouldRemember check
+        if(event.getAudio().getFilterResult() == RecordedAudio.FilterResult.PASSED){
+            VoiceChatRecording.LOGGER.debug("EVENT: Audio recorded! Filter result: {}", event.getAudio().getFilterResult());
+            VoiceChatRecording.storedAudios.add(event.getAudio());
+        }
     }
 
     @SubscribeEvent
