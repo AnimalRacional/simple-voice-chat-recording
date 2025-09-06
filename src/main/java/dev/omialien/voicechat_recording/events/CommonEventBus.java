@@ -41,10 +41,6 @@ public class CommonEventBus {
     @SubscribeEvent(priority = EventPriority.LOWEST)
     public static void onServerClosed(ServerStoppedEvent event){
         try{
-            // TODO maybe remove this saveaudio loop?
-            for(RecordedAudio audio : VoiceChatRecording.storedAudios){
-                audio.saveAudio();
-            }
             VoiceChatRecording.LOGGER.info("Shutting down audio saving...");
             RecordedAudio.shutdown();
         } catch(InterruptedException e){
