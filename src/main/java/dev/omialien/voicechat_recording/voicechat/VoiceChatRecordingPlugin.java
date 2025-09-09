@@ -184,8 +184,6 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin {
         UUID playerUuid = e.getConnection().getPlayer().getUuid();
         RecordedPlayer player = new RecordedPlayer(playerUuid);
         recordedPlayers.put(playerUuid, player);
-        // TODO disable loadPlayerAudios before releasing
-        loadPlayerAudios(playerUuid);
         startRecording(playerUuid);
     }
 

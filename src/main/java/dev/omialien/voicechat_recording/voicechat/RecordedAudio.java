@@ -69,7 +69,6 @@ public class RecordedAudio {
 
     public void saveAudio(){
         if(!VoiceChatRecordingPlugin.getPrivacy(this.player) && !saved){ // This method should only ever happen once per RecordedPlayer, no more no less
-            saved = true;
             Path userPath = audiosPath.resolve(this.player.toString());
             audioSaver.execute(() -> {
                 try{
@@ -84,6 +83,7 @@ public class RecordedAudio {
                         dos.writeShort(cur);
                     }
                     dos.close();
+                    saved = true;
                     VoiceChatRecording.LOGGER.info("Wrote recording to file {}", filePath);
                 } catch(IOException e){
                     VoiceChatRecording.LOGGER.error("Error saving audios for {}:\r\n{}\r\n{}", getPlayerUUID(), e.getMessage(), e.getStackTrace());
