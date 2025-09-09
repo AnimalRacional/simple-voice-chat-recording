@@ -9,10 +9,12 @@ import dev.omialien.voicechat_recording.voicechat.VoiceChatRecordingPlugin;
 import dev.omialien.voicechat_recording.voicechat.events.AudioEvent;
 import dev.omialien.voicechat_recording.voicechat.events.AudioLoadedEvent;
 import dev.omialien.voicechat_recording.voicechat.events.AudioRecordedEvent;
+import net.neoforged.bus.api.EventPriority;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
 import net.neoforged.neoforge.event.server.ServerStartingEvent;
+import net.neoforged.neoforge.event.server.ServerStoppedEvent;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 import net.neoforged.neoforge.network.registration.PayloadRegistrar;
@@ -35,7 +37,15 @@ public class CommonEventBus {
             }
         }
     }
-
+    @SubscribeEvent(priority = EventPriority.LOWEST)
+    public static void onServerClosed(ServerStoppedEvent event){
+        try{
+            VoiceChatRecording.LOGGER.info("Shutting down audio saving...");
+            RecordedAudio.shutdown();
+        } catch(InterruptedException e){
+            VoiceChatRecording.LOGGER.error("Audio saving shutdown interrupted! {}\n{}", e.getMessage(), e.getStackTrace());
+        }
+    }
     @SubscribeEvent
     public static void onRegisterCommands(RegisterCommandsEvent event) {
         NearestEntityPlayVoiceCommand.register(event.getDispatcher());

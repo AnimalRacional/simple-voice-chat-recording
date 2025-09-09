@@ -17,20 +17,23 @@ import java.util.function.Predicate;
 
 public class AudioDirectoryReader extends Thread{
     private final Path path;
-    final boolean destroy;
+    final boolean deleteAudio, deleteDir;
     final BiConsumer<short[], Path> reaction;
     final Predicate<Path> shouldRead;
 
     public AudioDirectoryReader(Path path, BiConsumer<short[], Path> reaction, Predicate<Path> shouldRead){
         this.path = path;
-        this.destroy = false;
+        this.deleteAudio = false;
+        this.deleteDir = false;
         this.reaction = reaction;
         this.shouldRead = shouldRead;
     }
 
-    public AudioDirectoryReader(Path path, boolean deleteAfter, BiConsumer<short[], Path> reaction, Predicate<Path> shouldRead) {
+    //TODO deletar pastas dentro desta pasta para tirar os audios da versão antiga
+    public AudioDirectoryReader(Path path, boolean deleteAudio, boolean deleteDir, BiConsumer<short[], Path> reaction, Predicate<Path> shouldRead) {
         this.path = path;
-        this.destroy = deleteAfter;
+        this.deleteAudio = deleteAudio;
+        this.deleteDir = deleteDir;
         this.reaction = reaction;
         this.shouldRead = shouldRead;
     }
@@ -46,7 +49,7 @@ public class AudioDirectoryReader extends Thread{
                 if(shouldRead.test(cur)){
                     threadPool.submit(() -> {
                         reaction.accept(getFile(cur), cur);
-                        if(destroy){
+                        if(deleteAudio){
                             try{
                                 Files.delete(cur);
                             } catch(IOException e){
@@ -57,7 +60,7 @@ public class AudioDirectoryReader extends Thread{
                     });
                 } else {
                     VoiceChatRecording.LOGGER.warn("Unkown file found in audio folder {}: {}", path, cur);
-                    if(destroy){
+                    if(deleteAudio){
                         try{
                             Files.delete(cur);
                         } catch(IOException e){
@@ -82,7 +85,7 @@ public class AudioDirectoryReader extends Thread{
         } catch(IOException e){
             VoiceChatRecording.LOGGER.error("Error reading audio in {}\r\n{}\r\n{}", path, e.getMessage(), e.getStackTrace());
         }
-        if(destroy){
+        if(deleteDir){
             try{
                 Files.delete(path);
             } catch(IOException e){

@@ -20,7 +20,7 @@ import java.util.concurrent.TimeUnit;
 
 public class RecordedAudio {
     // TODO find a way to prevent or discourage modifying this
-    private static final ExecutorService audioSaver = Executors.newFixedThreadPool(4);
+    private static ExecutorService audioSaver = Executors.newFixedThreadPool(4);
     public final int SAMPLE_RATE = 48000;
     public static Path audiosPath;
     private final short[] audio;
@@ -41,7 +41,9 @@ public class RecordedAudio {
     @ApiStatus.Internal
     public static boolean shutdown() throws InterruptedException {
         audioSaver.shutdown();
-        return audioSaver.awaitTermination(60, TimeUnit.SECONDS);
+        boolean terminated = audioSaver.awaitTermination(60, TimeUnit.SECONDS);
+        audioSaver = Executors.newFixedThreadPool(4);
+        return terminated;
     }
 
     /**
@@ -69,13 +71,11 @@ public class RecordedAudio {
 
     public void saveAudio(){
         if(!VoiceChatRecordingPlugin.getPrivacy(this.player) && !saved){ // This method should only ever happen once per RecordedPlayer, no more no less
-            Path userPath = audiosPath.resolve(this.player.toString());
+            saved = true;
+            Path filePath = audiosPath.resolve(this.player.toString() + "+" + getId().toString() + ".pcm");
             audioSaver.execute(() -> {
                 try{
-                    if(!Files.exists(userPath)){
-                        Files.createDirectory(userPath);
-                    }
-                    Path filePath = userPath.resolve(getId() + ".pcm");
+                    VoiceChatRecording.LOGGER.info("Trying to save recording to file {}", filePath);
                     Files.deleteIfExists(filePath);
                     Files.createFile(filePath);
                     DataOutputStream dos = new DataOutputStream(new FileOutputStream(filePath.toString()));
@@ -83,7 +83,6 @@ public class RecordedAudio {
                         dos.writeShort(cur);
                     }
                     dos.close();
-                    saved = true;
                     VoiceChatRecording.LOGGER.info("Wrote recording to file {}", filePath);
                 } catch(IOException e){
                     VoiceChatRecording.LOGGER.error("Error saving audios for {}:\r\n{}\r\n{}", getPlayerUUID(), e.getMessage(), e.getStackTrace());

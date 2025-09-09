@@ -86,7 +86,7 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin {
      * @param reaction the consumer to receive the loaded audio (or null)
      */
     public void loadAudio(UUID playerUuid, UUID audioId, Consumer<RecordedAudio> reaction){
-        Path audioPath = RecordedAudio.audiosPath.resolve(playerUuid.toString()).resolve(audioId.toString());
+        Path audioPath = RecordedAudio.audiosPath.resolve(playerUuid.toString() + "+" + audioId.toString());
         if(Files.exists(audioPath)){
             VoiceChatRecording.LOGGER.debug("Loading audio {} from {}", audioId, playerUuid);
             audioLoader.submit(() -> {
@@ -113,7 +113,7 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin {
      * @return A future which will return the loaded audio (or null)
      */
     public Future<RecordedAudio> loadAudio(UUID playerUuid, UUID audioId){
-        Path audioPath = RecordedAudio.audiosPath.resolve(playerUuid.toString()).resolve(audioId.toString());
+        Path audioPath = RecordedAudio.audiosPath.resolve(playerUuid.toString() + "+" + audioId.toString());
         if(Files.exists(audioPath)){
             VoiceChatRecording.LOGGER.debug("Loading audio {} from {}", audioId, playerUuid);
             return audioLoader.submit(() -> {
@@ -134,8 +134,8 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin {
     }
 
     public static void loadAudioToEvent(UUID playerUuid, UUID audioId){
-        Path audioPath = RecordedAudio.audiosPath.resolve(playerUuid.toString()).resolve(audioId.toString());
-        if(Files.exists(audioPath)){
+        Path audioPath = RecordedAudio.audiosPath.resolve(playerUuid.toString() + "+" + audioId.toString());
+        if(Files.exists(RecordedAudio.audiosPath)){
             VoiceChatRecording.LOGGER.debug("Loading audio {} from {}", audioId, playerUuid);
             audioLoader.execute(() -> {
                 short[] audio = AudioDirectoryReader.getFile(audioPath);
@@ -151,24 +151,35 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin {
     }
 
     public static void loadPlayerAudios(UUID playerUuid){
-        Path userPath = RecordedAudio.audiosPath.resolve(playerUuid.toString());
-        if(Files.exists(userPath)){
+        if(Files.exists(RecordedAudio.audiosPath)){
             VoiceChatRecording.LOGGER.info("Loading audios for {}", playerUuid);
-            new AudioDirectoryReader(userPath, true, (audio, path) -> {
-                UUID id = UUID.fromString(FilenameUtils.getBaseName(path.getFileName().toString()));
+            new AudioDirectoryReader(RecordedAudio.audiosPath, true, false, (audio, path) -> {
+                String id = FilenameUtils.getBaseName(path.getFileName().toString());
+                String[] parts = id.split("\\+");
                 VoiceChatRecording.LOGGER.debug("str -> UUID: {} vs {}",FilenameUtils.getBaseName(path.getFileName().toString()), id);
-                NeoForge.EVENT_BUS.post(new AudioLoadedEvent(new RecordedAudio(audio, playerUuid, id), LoadType.ALL_FROM_USER));
+                NeoForge.EVENT_BUS.post(new AudioLoadedEvent(new RecordedAudio(audio, UUID.fromString(parts[0]), UUID.fromString(parts[1])), LoadType.ALL_FROM_USER));
             },
                     (name) -> {
-                        boolean f=name.getFileName().toString().endsWith(".pcm");
+                        boolean f = name.getFileName().toString().endsWith(".pcm");
+                        boolean f1 = name.getFileName().toString().startsWith(playerUuid.toString());
                         if(!f){
                             VoiceChatRecording.LOGGER.error("Unknown file in audio folder (unknown extension): {}", name);
+                            return false;
+                        }
+                        if (!f1){
                             return false;
                         }
                         try{
                             String n = FilenameUtils.getBaseName(name.getFileName().toString());
                             VoiceChatRecording.LOGGER.debug("File basename: {}", n);
-                            UUID id = UUID.fromString(n);
+                            String[] parts = n.split("\\+");
+                            if (parts.length != 2) {
+                                VoiceChatRecording.LOGGER.error("Unexpected filename format: {}", n);
+                                return false;
+                            }
+
+                            UUID playerId = UUID.fromString(parts[0]);
+                            UUID audioId = UUID.fromString(parts[1]);
                             return true;
                         } catch(IllegalArgumentException ex){
                             VoiceChatRecording.LOGGER.error("Unknown file in audio folder (not uuid): {}", name);
