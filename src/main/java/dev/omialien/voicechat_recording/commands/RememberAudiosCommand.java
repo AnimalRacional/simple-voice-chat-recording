@@ -13,9 +13,9 @@ public class RememberAudiosCommand {
                 .executes((src) -> {
                     shouldRemember = !shouldRemember;
                     if (shouldRemember) {
-                        src.getSource().sendSuccess(() -> Component.literal("enabled saving"), true);
+                        src.getSource().sendSuccess(() -> Component.literal("enabled saving; this is for debug only, don't leave it on for too long"), true);
                     } else {
-                        src.getSource().sendSuccess(() -> Component.literal("disable saving"), true);
+                        src.getSource().sendSuccess(() -> Component.literal("disabled saving"), true);
                     }
                     return 0;
                 }));

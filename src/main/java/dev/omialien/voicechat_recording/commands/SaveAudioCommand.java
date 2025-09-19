@@ -2,6 +2,7 @@ package dev.omialien.voicechat_recording.commands;
 
 import com.mojang.brigadier.CommandDispatcher;
 import dev.omialien.voicechat_recording.VoiceChatRecording;
+import dev.omialien.voicechat_recording.voicechat.IRecordedAudio;
 import dev.omialien.voicechat_recording.voicechat.RecordedAudio;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
@@ -23,9 +24,9 @@ public class SaveAudioCommand {
                         .executes((src) -> {
             UUID id = UuidArgument.getUuid(src, "audio");
             RecordedAudio res = null;
-            for(RecordedAudio cur : VoiceChatRecording.storedAudios){
+            for(IRecordedAudio cur : VoiceChatRecording.storedAudios){
                 if(cur.getId().equals(id)){
-                    res = cur;
+                    res = (RecordedAudio) cur;
                     break;
                 }
             }
@@ -33,7 +34,7 @@ public class SaveAudioCommand {
                 if(res.wasSaved()){
                     src.getSource().sendFailure(Component.literal("Audio already saved"));
                 } else {
-                    res.saveAudio();
+                    res.saveAudio(VoiceChatRecording.MOD_ID);
                     src.getSource().sendSuccess(() -> Component.literal("Audio " + id + " saved"), true);
                 }
             } else {

@@ -3,24 +3,14 @@ package dev.omialien.voicechat_recording.voicechat;
 import dev.omialien.voicechat_recording.VoiceChatRecording;
 import dev.omialien.voicechat_recording.configs.RecordingCommonConfig;
 import dev.omialien.voicechat_recording.voicechat.audio.AudioEffect;
-import org.jetbrains.annotations.ApiStatus;
 
 import javax.annotation.Nullable;
-import java.io.DataOutputStream;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Arrays;
 import java.util.Objects;
 import java.util.UUID;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
 
-public class RecordedAudio {
+public class RecordedAudio implements IRecordedAudio {
     // TODO find a way to prevent or discourage modifying this
-    private static ExecutorService audioSaver = Executors.newFixedThreadPool(4);
     public final int SAMPLE_RATE = 48000;
     public static Path audiosPath;
     private final short[] audio;
@@ -38,29 +28,17 @@ public class RecordedAudio {
         this.saved = false;
     }
 
-    @ApiStatus.Internal
-    public static boolean shutdown() throws InterruptedException {
-        audioSaver.shutdown();
-        boolean terminated = audioSaver.awaitTermination(60, TimeUnit.SECONDS);
-        audioSaver = Executors.newFixedThreadPool(4);
-        return terminated;
-    }
-
-    /**
-     * Returns the underlying audio:
-     * do not modify this! It will
-     * also be modified for all other mods, instead
-     * use {@link Arrays#clone()} if you must modify the audio.
-     * @return the underlying audio
-     */
+    @Override
     public short[] getAudio(){
         return audio;
     }
 
+    @Override
     public UUID getPlayerUUID(){
         return this.player;
     }
 
+    @Override
     public UUID getId(){
         return this.id;
     }
@@ -69,47 +47,22 @@ public class RecordedAudio {
         return this.saved;
     }
 
-    public void saveAudio(){
+    @Override
+    public void saveAudio(String namespace){
         if(!VoiceChatRecordingPlugin.getPrivacy(this.player) && !saved){ // This method should only ever happen once per RecordedPlayer, no more no less
-            saved = true;
-            Path filePath = audiosPath.resolve(this.player.toString() + "+" + getId().toString() + ".pcm");
-            audioSaver.execute(() -> {
-                try{
-                    VoiceChatRecording.LOGGER.info("Trying to save recording to file {}", filePath);
-                    Files.deleteIfExists(filePath);
-                    Files.createFile(filePath);
-                    DataOutputStream dos = new DataOutputStream(new FileOutputStream(filePath.toString()));
-                    for (Short cur : audio) {
-                        dos.writeShort(cur);
-                    }
-                    dos.close();
-                    VoiceChatRecording.LOGGER.info("Wrote recording to file {}", filePath);
-                } catch(IOException e){
-                    VoiceChatRecording.LOGGER.error("Error saving audios for {}:\r\n{}\r\n{}", getPlayerUUID(), e.getMessage(), e.getStackTrace());
-                }
-            });
+            VoiceChatRecordingPlugin.saveAudio(namespace, this);
+            this.saved = true;
         } else if(saved){
             VoiceChatRecording.LOGGER.warn("Tried to save already-saved audio! {} by {}", getId(), getPlayerUUID());
         }
     }
 
-    /**
-     * Gets the underlying audio with the applied effects
-     * @param effect the effects applied to the audio
-     * @return the unchanged audio if effect is null, a copy of the audio with the effects applied otherwise
-     */
+    @Override
     public short[] applyEffects(@Nullable AudioEffect effect){
         return effect == null ? getAudio() : effect.applyEffects(getAudio().clone());
     }
 
-    public enum FilterResult {
-        PASSED,
-        TOO_LONG,
-        TOO_SHORT,
-        NO_ACTIVE_AUDIO,
-        LOW_RMS
-    }
-
+    @Override
     public FilterResult getFilterResult(){
         final double MIN_DURATION = 0.9;
         final double MAX_DURATION = 10;
@@ -127,10 +80,12 @@ public class RecordedAudio {
         return getRms() >= MIN_RMS ? FilterResult.PASSED : FilterResult.LOW_RMS;
     }
 
+    @Override
     public double getDuration(){
         return (double) audio.length / SAMPLE_RATE;
     }
 
+    @Override
     public double getActiveDuration(){
         return (double) getActiveSamples() / SAMPLE_RATE;
     }
@@ -147,6 +102,7 @@ public class RecordedAudio {
     private int activeSamplesCache;
     private double rmsCache;
     private boolean calculatedCaches = false;
+
     private void calculateCaches(){
         calculatedCaches = true;
         int start = 0;
@@ -173,11 +129,13 @@ public class RecordedAudio {
         this.activeSamplesCache = activeSamples;
     }
 
+    @Override
     public int getActiveSamples(){
         if(!calculatedCaches){ calculateCaches(); }
         return this.activeSamplesCache;
     }
 
+    @Override
     public double getRms(){
         if(!calculatedCaches){ calculateCaches(); }
         return this.rmsCache;
@@ -193,5 +151,9 @@ public class RecordedAudio {
     @Override
     public int hashCode() {
         return Objects.hash(this.getId(), this.getPlayerUUID());
+    }
+
+    public String fileName() {
+        return String.format("%s+%s.pcm", this.getPlayerUUID().toString(), this.getId().toString());
     }
 }

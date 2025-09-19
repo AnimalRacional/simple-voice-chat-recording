@@ -2,7 +2,7 @@ package dev.omialien.voicechat_recording.commands;
 
 import com.mojang.brigadier.CommandDispatcher;
 import dev.omialien.voicechat_recording.VoiceChatRecording;
-import dev.omialien.voicechat_recording.voicechat.RecordedAudio;
+import dev.omialien.voicechat_recording.voicechat.IRecordedAudio;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.Component;
@@ -14,7 +14,7 @@ public class ListAudiosCommand {
         dispatcher.register(Commands.literal("listAudios").requires((cmd) -> cmd.hasPermission(PERMS))
                 .executes((src) -> {
                     StringBuilder builder = new StringBuilder("Stored audios:\n");
-                    for(RecordedAudio audio : VoiceChatRecording.storedAudios){
+                    for(IRecordedAudio audio : VoiceChatRecording.storedAudios){
                         builder.append(audio.getId()).append(" by ");
                         Player p = src.getSource().getLevel().getPlayerByUUID(audio.getPlayerUUID());
                         builder.append(p == null ? audio.getPlayerUUID() : p.getName().getString()).append("\n");

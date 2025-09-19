@@ -5,7 +5,7 @@ import de.maxhenkel.voicechat.api.audiochannel.AudioChannel;
 import de.maxhenkel.voicechat.api.audiochannel.EntityAudioChannel;
 import de.maxhenkel.voicechat.api.audiochannel.LocationalAudioChannel;
 import dev.omialien.voicechat_recording.VoiceChatRecording;
-import dev.omialien.voicechat_recording.voicechat.RecordedAudio;
+import dev.omialien.voicechat_recording.voicechat.IRecordedAudio;
 import dev.omialien.voicechat_recording.voicechat.audio.AudioEffect;
 import dev.omialien.voicechat_recording.voicechat.audio.AudioPlayer;
 import net.minecraft.server.level.ServerLevel;
@@ -15,10 +15,10 @@ import net.minecraft.world.phys.Vec3;
 import java.util.UUID;
 
 public class AudioPlayingUtil {
-    public static void playLocationalAudio(RecordedAudio audio, Vec3 position, ServerLevel level, String category){
+    public static void playLocationalAudio(IRecordedAudio audio, Vec3 position, ServerLevel level, String category){
         playLocationalAudio(audio, position, level, null, category, 32);
     }
-    public static void playLocationalAudio(RecordedAudio audio, Vec3 position, ServerLevel level, AudioEffect effects, String category, float distance){
+    public static void playLocationalAudio(IRecordedAudio audio, Vec3 position, ServerLevel level, AudioEffect effects, String category, float distance){
         if(audio == null){ return; }
         LocationalAudioChannel chan = VoiceChatRecording.vcApi.createLocationalAudioChannel(
             UUID.randomUUID(),
@@ -34,11 +34,11 @@ public class AudioPlayingUtil {
         play(audio.applyEffects(effects), chan, VoiceChatRecording.vcApi);
     }
 
-    public static void playFromEntity(RecordedAudio audio, Entity entity, String category){
+    public static void playFromEntity(IRecordedAudio audio, Entity entity, String category){
         playFromEntity(audio, entity, null, category, 32);
     }
 
-    public static void playFromEntity(RecordedAudio audio, Entity entity, AudioEffect effects, String category, float distance){
+    public static void playFromEntity(IRecordedAudio audio, Entity entity, AudioEffect effects, String category, float distance){
         if(audio == null){ return; }
         VoicechatServerApi api = VoiceChatRecording.vcApi;
         EntityAudioChannel chan = api.createEntityAudioChannel(

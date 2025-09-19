@@ -7,7 +7,7 @@ import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
 import dev.omialien.voicechat_recording.VoiceChatRecording;
-import dev.omialien.voicechat_recording.voicechat.RecordedAudio;
+import dev.omialien.voicechat_recording.voicechat.IRecordedAudio;
 import dev.omialien.voicechat_recording.voicechat.audio.AudioEffect;
 import dev.omialien.voicechat_recording.voicechat.util.AudioPlayingUtil;
 import net.minecraft.commands.CommandSourceStack;
@@ -122,8 +122,8 @@ public class NearestEntityPlayVoiceCommand {
                                   Entity entity, UUID id,
                                   AudioEffect effects){
         VoiceChatRecording.LOGGER.debug("Entity: " + entity.getName());
-        RecordedAudio audio = null;
-        for(RecordedAudio cur : VoiceChatRecording.storedAudios){
+        IRecordedAudio audio = null;
+        for(IRecordedAudio cur : VoiceChatRecording.storedAudios){
             if(cur.getId().equals(id)){
                 audio = cur;
                 break;
@@ -133,7 +133,7 @@ public class NearestEntityPlayVoiceCommand {
             Player player = entity.level().getPlayerByUUID(audio.getPlayerUUID());
             String playerName = player == null ? audio.getPlayerUUID().toString() : player.getName().getString();
             ctx.getSource().sendSuccess(() ->
-                    Component.literal("Playing audio of " + playerName + " from " + entity.getName()), true);
+                    Component.literal("Playing audio of " + playerName + " from ").append(entity.getName()), true);
             AudioPlayingUtil.playFromEntity(audio, entity, effects, VoiceChatRecording.CATEGORY_ID, CHANNEL_DISTANCE);
         } else {
             ctx.getSource().sendFailure(Component.literal("Invalid ID " + id));

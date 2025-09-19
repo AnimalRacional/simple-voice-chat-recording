@@ -4,6 +4,7 @@ import dev.omialien.voicechat_recording.VoiceChatRecording;
 import dev.omialien.voicechat_recording.commands.*;
 import dev.omialien.voicechat_recording.networking.PrivacyModePacket;
 import dev.omialien.voicechat_recording.networking.ServerPayloadHandler;
+import dev.omialien.voicechat_recording.voicechat.IRecordedAudio;
 import dev.omialien.voicechat_recording.voicechat.RecordedAudio;
 import dev.omialien.voicechat_recording.voicechat.VoiceChatRecordingPlugin;
 import dev.omialien.voicechat_recording.voicechat.events.AudioEvent;
@@ -41,7 +42,7 @@ public class CommonEventBus {
     public static void onServerClosed(ServerStoppedEvent event){
         try{
             VoiceChatRecording.LOGGER.info("Shutting down audio saving...");
-            RecordedAudio.shutdown();
+            VoiceChatRecordingPlugin.shutdownSaving();
         } catch(InterruptedException e){
             VoiceChatRecording.LOGGER.error("Audio saving shutdown interrupted! {}\n{}", e.getMessage(), e.getStackTrace());
         }
@@ -62,6 +63,8 @@ public class CommonEventBus {
     @SubscribeEvent
     public static void tickEvent(ServerTickEvent.Post event){
         VoiceChatRecording.TASKS.tick();
+        VoiceChatRecordingPlugin.audioSavingTask.tick();
+        VoiceChatRecordingPlugin.audioLoadingCacheRemovalTasks.tick();
     }
 
     @SubscribeEvent
@@ -76,7 +79,7 @@ public class CommonEventBus {
 
     @SubscribeEvent
     public static void onRecordedAudio(AudioRecordedEvent event){
-        RecordedAudio audio = event.getAudio();
+        IRecordedAudio audio = event.getAudio();
 
         if(RememberAudiosCommand.shouldRemember && audio.getFilterResult() == RecordedAudio.FilterResult.PASSED){
             VoiceChatRecording.LOGGER.debug("EVENT: Audio recorded! Filter result: {}", audio.getFilterResult());

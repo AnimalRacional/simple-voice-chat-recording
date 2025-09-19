@@ -5,7 +5,7 @@ import de.maxhenkel.voicechat.api.VoicechatServerApi;
 import dev.omialien.voicechat_recording.configs.RecordingClientConfig;
 import dev.omialien.voicechat_recording.configs.RecordingCommonConfig;
 import dev.omialien.voicechat_recording.taskscheduler.TaskScheduler;
-import dev.omialien.voicechat_recording.voicechat.RecordedAudio;
+import dev.omialien.voicechat_recording.voicechat.IRecordedAudio;
 import net.minecraft.world.level.storage.LevelResource;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.ModContainer;
@@ -27,7 +27,7 @@ public class VoiceChatRecording {
     public static final LevelResource AUDIO_DIRECTORY = new LevelResource("player_audios");
     // Directly reference a slf4j logger
     public static final Logger LOGGER = LogUtils.getLogger();
-    public static final List<RecordedAudio> storedAudios = new ArrayList<>();
+    public static final List<IRecordedAudio> storedAudios = new ArrayList<>();
 
     // The constructor for the mod class is the first code that is run when your mod is loaded.
     // FML will recognize some parameter types like IEventBus or ModContainer and pass them in automatically.

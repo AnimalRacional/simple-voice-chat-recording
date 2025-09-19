@@ -21,7 +21,7 @@ public class AudioInfoCommand {
                                 VoiceChatRecording.storedAudios.stream().map((r) -> r.getId().toString()), suggestionsBuilder))
                         .executes((src) -> {
                     UUID id = UuidArgument.getUuid(src, "audio");
-                    RecordedAudio res = VoiceChatRecording.storedAudios.stream().filter(cur -> cur.getId().equals(id)).findFirst().orElse(null);
+                    RecordedAudio res = (RecordedAudio)VoiceChatRecording.storedAudios.stream().filter(cur -> cur.getId().equals(id)).findFirst().orElse(null);
                     if(res != null){
                         src.getSource().sendSuccess(() -> Component.literal(res.getAudioInfo()), false);
                     } else {
