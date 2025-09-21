@@ -1,6 +1,4 @@
-package dev.omialien.voicechat_recording.voicechat;
-
-import dev.omialien.voicechat_recording.voicechat.audio.AudioEffect;
+package dev.omialien.voicechat_recording_api;
 
 import javax.annotation.Nullable;
 import java.util.Arrays;

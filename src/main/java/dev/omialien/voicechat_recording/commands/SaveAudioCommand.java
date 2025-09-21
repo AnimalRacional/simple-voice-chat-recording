@@ -2,7 +2,7 @@ package dev.omialien.voicechat_recording.commands;
 
 import com.mojang.brigadier.CommandDispatcher;
 import dev.omialien.voicechat_recording.VoiceChatRecording;
-import dev.omialien.voicechat_recording.voicechat.IRecordedAudio;
+import dev.omialien.voicechat_recording_api.IRecordedAudio;
 import dev.omialien.voicechat_recording.voicechat.RecordedAudio;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;

@@ -4,12 +4,13 @@ import dev.omialien.voicechat_recording.VoiceChatRecording;
 import dev.omialien.voicechat_recording.commands.*;
 import dev.omialien.voicechat_recording.networking.PrivacyModePacket;
 import dev.omialien.voicechat_recording.networking.ServerPayloadHandler;
-import dev.omialien.voicechat_recording.voicechat.IRecordedAudio;
+import dev.omialien.voicechat_recording_api.IRecordedAudio;
 import dev.omialien.voicechat_recording.voicechat.RecordedAudio;
 import dev.omialien.voicechat_recording.voicechat.VoiceChatRecordingPlugin;
-import dev.omialien.voicechat_recording.voicechat.events.AudioEvent;
-import dev.omialien.voicechat_recording.voicechat.events.AudioLoadedEvent;
-import dev.omialien.voicechat_recording.voicechat.events.AudioRecordedEvent;
+import dev.omialien.voicechat_recording_api.events.AudioEvent;
+import dev.omialien.voicechat_recording_api.events.AudioLoadedEvent;
+import dev.omialien.voicechat_recording_api.events.AudioRecordedEvent;
+import dev.omialien.voicechat_recording_api.events.RecordingSetupEvent;
 import net.neoforged.bus.api.EventPriority;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
@@ -27,7 +28,6 @@ import java.nio.file.Files;
 public class CommonEventBus {
     @SubscribeEvent
     public static void onServerStarting(ServerStartingEvent event) {
-        VoiceChatRecordingPlugin.addCategory(VoiceChatRecording.CATEGORY_ID, "Recording Plugin", "The volume of recorded voices", null);
         VoiceChatRecording.LOGGER.debug("Server starting");
         RecordedAudio.audiosPath = event.getServer().getWorldPath(VoiceChatRecording.AUDIO_DIRECTORY);
         if(!Files.exists(RecordedAudio.audiosPath)){
@@ -38,11 +38,17 @@ public class CommonEventBus {
             }
         }
     }
+
+    @SubscribeEvent
+    public static void onRecordingSetup(RecordingSetupEvent event) {
+        event.addCategory(VoiceChatRecording.CATEGORY_ID, "Recording Plugin", "The volume of recorded voices", null);
+    }
+
     @SubscribeEvent(priority = EventPriority.LOWEST)
     public static void onServerClosed(ServerStoppedEvent event){
         try{
             VoiceChatRecording.LOGGER.info("Shutting down audio saving...");
-            VoiceChatRecordingPlugin.shutdownSaving();
+            ((VoiceChatRecordingPlugin)VoiceChatRecording.recordingApi).shutdownSaving();
         } catch(InterruptedException e){
             VoiceChatRecording.LOGGER.error("Audio saving shutdown interrupted! {}\n{}", e.getMessage(), e.getStackTrace());
         }
@@ -63,8 +69,8 @@ public class CommonEventBus {
     @SubscribeEvent
     public static void tickEvent(ServerTickEvent.Post event){
         VoiceChatRecording.TASKS.tick();
-        VoiceChatRecordingPlugin.audioSavingTask.tick();
-        VoiceChatRecordingPlugin.audioLoadingCacheRemovalTasks.tick();
+        ((VoiceChatRecordingPlugin)(VoiceChatRecording.recordingApi)).audioSavingTask.tick();
+        ((VoiceChatRecordingPlugin)(VoiceChatRecording.recordingApi)).audioLoadingCacheRemovalTasks.tick();
     }
 
     @SubscribeEvent

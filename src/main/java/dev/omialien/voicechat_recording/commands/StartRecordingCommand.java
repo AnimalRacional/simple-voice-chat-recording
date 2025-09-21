@@ -1,6 +1,7 @@
 package dev.omialien.voicechat_recording.commands;
 
 import com.mojang.brigadier.CommandDispatcher;
+import dev.omialien.voicechat_recording.VoiceChatRecording;
 import dev.omialien.voicechat_recording.voicechat.VoiceChatRecordingPlugin;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
@@ -13,7 +14,7 @@ public class StartRecordingCommand {
         dispatcher.register(Commands.literal("startRecording").requires((cmdSrc) -> cmdSrc.hasPermission(PERMISSION_LEVEL)).executes((cmdSrc) -> {
             Player player = cmdSrc.getSource().getPlayerOrException();
 
-            VoiceChatRecordingPlugin.startRecording(player.getUUID());
+            ((VoiceChatRecordingPlugin) VoiceChatRecording.recordingApi).startRecording(player.getUUID());
 
             cmdSrc.getSource().sendSuccess(() -> Component.literal("Started Recording for " + player.getGameProfile().getName() + "..."), false);
 

@@ -1,9 +1,8 @@
 package dev.omialien.voicechat_recording.commands;
 
-import dev.omialien.voicechat_recording.VoiceChatRecording;
-import dev.omialien.voicechat_recording.voicechat.VoiceChatRecordingPlugin;
 import com.mojang.authlib.GameProfile;
 import com.mojang.brigadier.CommandDispatcher;
+import dev.omialien.voicechat_recording.VoiceChatRecording;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.commands.SharedSuggestionProvider;
@@ -28,7 +27,7 @@ public class IsRecordingCommand {
             Collection<GameProfile> targets = GameProfileArgument.getGameProfiles(cmdSrc, "targets");
 
             for (GameProfile target : targets) {
-                sb.append(target.getName()).append(": ").append(VoiceChatRecordingPlugin.getRecordedPlayer(target.getId()).isRecording());
+                sb.append(target.getName()).append(": ").append((VoiceChatRecording.recordingApi).getRecordedPlayer(target.getId()).isRecording());
                 if (targets.size() != 1) sb.append("\n");
             }
 

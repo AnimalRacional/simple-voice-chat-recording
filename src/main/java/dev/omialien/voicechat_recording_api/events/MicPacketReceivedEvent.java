@@ -1,4 +1,4 @@
-package dev.omialien.voicechat_recording.voicechat.events;
+package dev.omialien.voicechat_recording_api.events;
 
 import de.maxhenkel.voicechat.api.events.MicrophonePacketEvent;
 import de.maxhenkel.voicechat.api.packets.MicrophonePacket;

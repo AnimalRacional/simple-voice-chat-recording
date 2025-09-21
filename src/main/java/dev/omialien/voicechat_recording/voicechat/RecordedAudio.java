@@ -2,7 +2,8 @@ package dev.omialien.voicechat_recording.voicechat;
 
 import dev.omialien.voicechat_recording.VoiceChatRecording;
 import dev.omialien.voicechat_recording.configs.RecordingCommonConfig;
-import dev.omialien.voicechat_recording.voicechat.audio.AudioEffect;
+import dev.omialien.voicechat_recording_api.AudioEffect;
+import dev.omialien.voicechat_recording_api.IRecordedAudio;
 
 import javax.annotation.Nullable;
 import java.nio.file.Path;
@@ -49,8 +50,8 @@ public class RecordedAudio implements IRecordedAudio {
 
     @Override
     public void saveAudio(String namespace){
-        if(!VoiceChatRecordingPlugin.getPrivacy(this.player) && !saved){ // This method should only ever happen once per RecordedPlayer, no more no less
-            VoiceChatRecordingPlugin.saveAudio(namespace, this);
+        if(!VoiceChatRecording.recordingApi.getPrivacy(this.player) && !saved){ // This method should only ever happen once per RecordedPlayer, no more no less
+            VoiceChatRecording.recordingApi.saveAudio(namespace, this);
             this.saved = true;
         } else if(saved){
             VoiceChatRecording.LOGGER.warn("Tried to save already-saved audio! {} by {}", getId(), getPlayerUUID());

@@ -9,11 +9,12 @@ import de.maxhenkel.voicechat.api.events.*;
 import dev.omialien.voicechat_recording.VoiceChatRecording;
 import dev.omialien.voicechat_recording.configs.RecordingCommonConfig;
 import dev.omialien.voicechat_recording.taskscheduler.TaskScheduler;
-import dev.omialien.voicechat_recording.voicechat.events.AudioLoadedEvent;
-import dev.omialien.voicechat_recording.voicechat.events.MicPacketReceivedEvent;
-import dev.omialien.voicechat_recording.voicechat.events.RecordingSetupEvent;
+import dev.omialien.voicechat_recording_api.IRecordedPlayer;
+import dev.omialien.voicechat_recording_api.VoiceChatRecordingApi;
+import dev.omialien.voicechat_recording_api.events.AudioLoadedEvent;
+import dev.omialien.voicechat_recording_api.events.MicPacketReceivedEvent;
+import dev.omialien.voicechat_recording_api.events.RecordingSetupEvent;
 import net.neoforged.neoforge.common.NeoForge;
-import org.jetbrains.annotations.ApiStatus;
 
 import javax.annotation.Nullable;
 import java.io.*;
@@ -25,25 +26,25 @@ import java.util.concurrent.*;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
+// TODO check if leaving and rejoining world or servers messes up things since they stopped being static
 @ForgeVoicechatPlugin
-public class VoiceChatRecordingPlugin implements VoicechatPlugin {
-    private static Map<UUID, RecordedPlayer> recordedPlayers;
-    private static Map<UUID, Boolean> privacyMode;
-    private static Queue<VolumeCategory> categories;
-    private static ExecutorService audioLoader;
+public class VoiceChatRecordingPlugin implements VoicechatPlugin, VoiceChatRecordingApi {
     private static final Gson gson = new Gson();
-    private static Map<String, Set<Pair<UUID, UUID>>> savedAudios;
-    private static Map<String, Set<RecordedAudio>> savedAudiosCache;
+    private Map<UUID, RecordedPlayer> recordedPlayers;
+    private Map<UUID, Boolean> privacyMode;
+    private ExecutorService audioLoader;
+    private Map<String, Set<Pair<UUID, UUID>>> savedAudios;
+    private Map<String, Set<RecordedAudio>> savedAudiosCache;
     // TODO is this queue really needed? check if the concurrenthashmap can handle both the saving thread removing audios and adding new audios
-    private static Queue<Pair<String, RecordedAudio>> audiosToSave;
-    public static TaskScheduler audioSavingTask;
-    private static boolean audioSavingTaskScheduled = false;
+    private Queue<Pair<String, RecordedAudio>> audiosToSave;
+    public TaskScheduler audioSavingTask;
+    private boolean audioSavingTaskScheduled = false;
     // TODO audio saving cooldown config
-    private static final long audioSaveCooldown = 15 * 20; // 15 seconds for debug
-    private static Thread audioSavingThread;
+    private final long audioSaveCooldown = 15 * 20; // 15 seconds for debug
+    private Thread audioSavingThread;
 
     // TODO delete audio files that aren't saved by any namespace
-    private static void createAudioSavingThread() {
+    private void createAudioSavingThread() {
         // TODO maybe instead of creating a thread every time make a separate thread that is always running while in a server
         VoiceChatRecording.LOGGER.debug("Recreating saving thread");
         audioSavingThread = new Thread(() -> {
@@ -114,7 +115,7 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin {
             while(!audiosToSave.isEmpty()) {
                 if(!audioSavingTaskScheduled){
                     audioSavingTaskScheduled = true;
-                    audioSavingTask.schedule(VoiceChatRecordingPlugin::saveAudios, audioSaveCooldown);
+                    audioSavingTask.schedule(this::saveAudios, audioSaveCooldown);
                 }
                 Pair<String, RecordedAudio> pair = audiosToSave.remove();
                 if(!savedAudiosCache.containsKey(pair.getFirst())) {
@@ -134,8 +135,7 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin {
         return VoiceChatRecording.MOD_ID;
     }
 
-    @ApiStatus.Internal
-    public static void shutdownSaving() throws InterruptedException {
+    public void shutdownSaving() throws InterruptedException {
         audioSavingTask = new TaskScheduler();
         audioSavingTaskScheduled = false;
         if(audioSavingThread == null || !audioSavingThread.isAlive()){
@@ -161,7 +161,7 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin {
      */
     @Override
     public void initialize(VoicechatApi api) {
-        categories = new LinkedList<>();
+        VoiceChatRecording.recordingApi = this;
         if(api instanceof VoicechatServerApi napi){
             VoiceChatRecording.LOGGER.info("Server Voice Chat API");
             VoiceChatRecording.vcApi = napi;
@@ -187,17 +187,40 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin {
         VoiceChatRecording.LOGGER.info("Voice chat recording plugin initialized!");
     }
 
-    private static void saveAudios() {
+    private void onServerStarted(VoicechatServerStartedEvent event) {
+        VoicechatServerApi api = event.getVoicechat();
+
+        try {
+            loadNamespaceFiles();
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+
+        recordedPlayers = new ConcurrentHashMap<>();
+        privacyMode = new ConcurrentHashMap<>();
+        VoiceChatRecording.LOGGER.debug("STARTING SCHEDULER");
+        VoiceChatRecording.TASKS.schedule(this::checkForSilence, 20);
+        RecordingSetupEvent eventResult = NeoForge.EVENT_BUS.post(new RecordingSetupEvent(this));
+        Iterator<VolumeCategory> it = eventResult.getCategories();
+        while(it.hasNext()) {
+            VolumeCategory cat = it.next();
+            VoiceChatRecording.LOGGER.debug("Registering category {}", cat.getName());
+            api.registerVolumeCategory(cat);
+        }
+    }
+
+    private void saveAudios() {
         if(audioSavingThread.isAlive()) {
             VoiceChatRecording.LOGGER.warn("Tried to save audios while thread was started: trying again in 5 minutes");
-            audioSavingTask.schedule(VoiceChatRecordingPlugin::saveAudios, audioSaveCooldown);
+            audioSavingTask.schedule(this::saveAudios, audioSaveCooldown);
         } else {
             createAudioSavingThread();
             audioSavingThread.start();
         }
     }
 
-    public static void saveAudio(String namespace, RecordedAudio audio){
+    @Override
+    public void saveAudio(String namespace, RecordedAudio audio){
         if(audioSavingThread.isAlive()) {
             // Thread is running, so we shouldn't mess with the hashmap, or we risk blocking here until it finishes saving
             VoiceChatRecording.LOGGER.debug("thread is alive, adding to queue");
@@ -215,7 +238,7 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin {
         if(!audioSavingTaskScheduled){
             audioSavingTaskScheduled = true;
             VoiceChatRecording.LOGGER.info("Audios will be saved in 5 minutes");
-            audioSavingTask.schedule(VoiceChatRecordingPlugin::saveAudios, audioSaveCooldown);
+            audioSavingTask.schedule(this::saveAudios, audioSaveCooldown);
         }
     }
 
@@ -241,7 +264,7 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin {
         }
     }
 
-    private static void loadNamespaceFiles() throws IOException {
+    private void loadNamespaceFiles() throws IOException {
         Path basePath = RecordedAudio.audiosPath;
         try (DirectoryStream<Path> directoryStream = Files.newDirectoryStream(basePath)) {
             for(Path curNamespace : directoryStream) {
@@ -271,7 +294,7 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin {
     // This should be fine to not reset between worlds, as even in different worlds
     // there shouldn't be 2 audios with the same UUIDs and this is only used to
     // quickly retrieve already-loaded audios, not actually load them
-    private static Map<Pair<UUID, UUID>, Future<RecordedAudio>> audioLoadingCache = new ConcurrentHashMap<>();
+    private Map<Pair<UUID, UUID>, Future<RecordedAudio>> audioLoadingCache = new ConcurrentHashMap<>();
     // TODO this is currently tied to the game TPS, maybe make this a thread that's always running
     // and just sleep it to act as the cooldown;
     // Ending it early because of game shutdown is no problem as loading won't be needed in that case anyway, only saving.
@@ -279,9 +302,9 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin {
     // if it's somehow cached twice, and it's impossible to stop an audio from being removed after the initial
     // scheduling so audios being constantly used won't stop them from being removed
     // TODO implement removing from cache
-    public static TaskScheduler audioLoadingCacheRemovalTasks = new TaskScheduler();
+    public TaskScheduler audioLoadingCacheRemovalTasks = new TaskScheduler();
 
-    private static RecordedAudio readAudioFromFile(Path audioPath, Consumer<RecordedAudio> reaction, Pair<UUID, UUID> ids, LoadType type) {
+    private RecordedAudio readAudioFromFile(Path audioPath, Consumer<RecordedAudio> reaction, Pair<UUID, UUID> ids, LoadType type) {
         File audioFile = audioPath.toFile();
         try (DataInputStream dis = new DataInputStream(new FileInputStream(audioFile))) {
             short[] audio = new short[(int)(audioFile.length() / 2)];
@@ -303,7 +326,7 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin {
     }
 
     @Nullable
-    private static Future<RecordedAudio> loadRawAudio(Pair<UUID, UUID> ids, LoadType type, Consumer<RecordedAudio> reaction) {
+    private Future<RecordedAudio> loadRawAudio(Pair<UUID, UUID> ids, LoadType type, Consumer<RecordedAudio> reaction) {
         Path audioPath = RecordedAudio.audiosPath.resolve(RecordedAudio.getFileName(ids.getFirst(), ids.getSecond()));
         if(!Files.exists(audioPath)) {
             VoiceChatRecording.LOGGER.error("Tried to load non-existent audio {}", audioPath);
@@ -314,12 +337,12 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin {
         if(audioLoadingCache.containsKey(ids)) {
             return audioLoadingCache.get(ids);
         }
-        audioLoadingCache.put(ids, audioLoader.submit(() -> VoiceChatRecordingPlugin.readAudioFromFile(audioPath, reaction, ids, type)));
+        audioLoadingCache.put(ids, audioLoader.submit(() -> this.readAudioFromFile(audioPath, reaction, ids, type)));
         VoiceChatRecording.LOGGER.debug("Not in cache, added");
         return audioLoadingCache.get(ids);
     }
 
-    private static Future<RecordedAudio> loadRawAudio(Pair<UUID, UUID> ids, LoadType type){
+    private Future<RecordedAudio> loadRawAudio(Pair<UUID, UUID> ids, LoadType type){
         return loadRawAudio(ids, type, (audio) -> {});
     }
 
@@ -329,7 +352,8 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin {
      * @param reaction a consumer to react to the loaded {@link RecordedAudio}; if an error occurs, the audio will be null
      * @return a list of futures of the loaded audios
      */
-    public static List<Future<RecordedAudio>> loadNamespaceAudios(String namespace, Consumer<RecordedAudio> reaction) {
+    @Override
+    public List<Future<RecordedAudio>> loadNamespaceAudios(String namespace, Consumer<RecordedAudio> reaction) {
         if(!savedAudios.containsKey(namespace)) {
             VoiceChatRecording.LOGGER.warn("Tried to load from non-existent namespace {}", namespace);
             return Collections.emptyList();
@@ -337,7 +361,7 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin {
         Set<Pair<UUID, UUID>> toLoad = savedAudios.get(namespace);
         List<Future<RecordedAudio>> loadedAudios = new ArrayList<>(toLoad.size());
         for(Pair<UUID, UUID> cur : toLoad) {
-            loadedAudios.add(loadRawAudio(cur, LoadType.NAMESPACE));
+            loadedAudios.add(loadRawAudio(cur, LoadType.NAMESPACE, reaction));
         }
         return loadedAudios;
     }
@@ -348,7 +372,8 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin {
      * @return a list of futures of the loaded audios. If an error occurs, the audio will be null
      * Also see {@link VoiceChatRecordingPlugin#loadNamespaceAudios(String, Consumer)}
      */
-    public static List<Future<RecordedAudio>> loadNamespaceAudios(String namespace) {
+    @Override
+    public List<Future<RecordedAudio>> loadNamespaceAudios(String namespace) {
         return loadNamespaceAudios(namespace, (audio) -> {});
     }
 
@@ -359,7 +384,8 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin {
      * @param namespace the namespace to retrieve audios from
      * @return a set of all the identifiers of the audios saved to the given namespace
      */
-    public static Set<Pair<UUID, UUID>> getNamespaceAudios(String namespace) {
+    @Override
+    public Set<Pair<UUID, UUID>> getNamespaceAudios(String namespace) {
         return Collections.unmodifiableSet(savedAudios.getOrDefault(namespace, Collections.emptySet()));
     }
 
@@ -370,6 +396,7 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin {
      * @param reaction a consumer that will receive the loaded audio
      * @return a future which will return the loaded audio or null if an error occurs
      */
+    @Override
     public Future<RecordedAudio> loadAudio(UUID playerUuid, UUID audioId, Consumer<RecordedAudio> reaction) {
         // TODO, remember to check and add to cache
         return loadRawAudio(new Pair<>(playerUuid, audioId), LoadType.SINGLE, reaction);
@@ -381,6 +408,7 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin {
      * @param audioId the uuid of the audio to load
      * @return a future which will return the loaded audio or null if an error occurs
      */
+    @Override
     public Future<RecordedAudio> loadAudio(UUID playerUuid, UUID audioId){
         return loadAudio(playerUuid, audioId, (audio) -> {});
     }
@@ -391,7 +419,8 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin {
      * @param reaction The reaction to pass the audio to
      * @return a list of futures which will return either the loaded audios or null if an error occurred
      */
-    public static List<Future<RecordedAudio>> loadPlayerAudios(UUID playerUuid, Consumer<RecordedAudio> reaction) {
+    @Override
+    public List<Future<RecordedAudio>> loadPlayerAudios(UUID playerUuid, Consumer<RecordedAudio> reaction) {
         // Assume 50 audios per namespace for pre-allocating memory
         List<Future<RecordedAudio>> loadedAudios = new ArrayList<>(savedAudios.keySet().size() * 50);
         for(Set<Pair<UUID, UUID>> audios : savedAudios.values()) {
@@ -409,7 +438,8 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin {
      * @param playerUuid the UUID of the player to get audios of
      * @return a list of futures which will return either the player's audio or null if an error occured
      */
-    public static List<Future<RecordedAudio>> loadPlayerAudios(UUID playerUuid){
+    @Override
+    public List<Future<RecordedAudio>> loadPlayerAudios(UUID playerUuid){
         return loadPlayerAudios(playerUuid, (audio) -> {});
     }
 
@@ -418,15 +448,6 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin {
         RecordedPlayer player = new RecordedPlayer(playerUuid);
         recordedPlayers.put(playerUuid, player);
         startRecording(playerUuid);
-    }
-
-    public static void addCategory(String id, String name, String description, @Nullable int[][] icon){
-            categories.add(VoiceChatRecording.vcApi.volumeCategoryBuilder()
-                .setId(id)
-                .setName(name)
-                .setDescription(description)
-                .setIcon(icon)
-                .build());
     }
 
     private void onPlayerDisconnected(PlayerDisconnectedEvent e){
@@ -438,62 +459,38 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin {
         recordedPlayers.remove(pid);
     }
 
-    private void onServerStarted(VoicechatServerStartedEvent event) {
-        VoicechatServerApi api = event.getVoicechat();
-
-        try {
-            loadNamespaceFiles();
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-
-        for(VolumeCategory cat : categories){
-            VoiceChatRecording.LOGGER.debug("Registering category {}", cat.getName());
-            api.registerVolumeCategory(cat);
-        }
-        categories.clear();
-
-        recordedPlayers = new ConcurrentHashMap<>();
-        privacyMode = new ConcurrentHashMap<>();
-        VoiceChatRecording.LOGGER.debug("STARTING SCHEDULER");
-        VoiceChatRecording.TASKS.schedule(VoiceChatRecordingPlugin::checkForSilence, 20);
-        NeoForge.EVENT_BUS.post(new RecordingSetupEvent());
-    }
-
-    public static void stopRecording(UUID uuid) {
+    public void stopRecording(UUID uuid) {
         recordedPlayers.get(uuid).saveCurrentRecording();
         VoiceChatRecording.LOGGER.debug("Stopped recording for player: " + uuid.toString());
 
     }
 
-    public static void startRecording(UUID uuid) {
+    public void startRecording(UUID uuid) {
         recordedPlayers.get(uuid).startRecording();
         VoiceChatRecording.LOGGER.debug("Recording started for player: " + uuid.toString());
     }
 
-    public static IRecordedPlayer getRecordedPlayer(UUID uuid) {
+    @Override
+    public IRecordedPlayer getRecordedPlayer(UUID uuid) {
         return recordedPlayers.get(uuid);
     }
 
-    private static Map<UUID, RecordedPlayer> getRecordedPlayers() {
-        return recordedPlayers;
-    }
-
-    public static boolean getPrivacy(UUID uuid){
+    @Override
+    public boolean getPrivacy(UUID uuid){
         return privacyMode.getOrDefault(uuid, true);
     }
-    public static void setPrivacy(UUID uuid, boolean state){
+    public void setPrivacy(UUID uuid, boolean state){
         privacyMode.put(uuid, state);
     }
 
-    private static void checkForSilence() {
-        for (RecordedPlayer player : VoiceChatRecordingPlugin.getRecordedPlayers().values()) {
+    private void checkForSilence() {
+        for (RecordedPlayer player : recordedPlayers.values()) {
             if(player.isSpeaking()) continue;
             if (player.isSilent()) continue;
             VoiceChatRecording.LOGGER.debug("Stopped Speaking!");
-            VoiceChatRecordingPlugin.stopRecording(player.getUuid());
+            this.stopRecording(player.getUuid());
             player.setSilent(true);
         }
-        VoiceChatRecording.TASKS.schedule(VoiceChatRecordingPlugin::checkForSilence, 25);
+        VoiceChatRecording.TASKS.schedule(this::checkForSilence, 25);
     }
 }

@@ -3,7 +3,8 @@ package dev.omialien.voicechat_recording.voicechat;
 import de.maxhenkel.voicechat.api.opus.OpusDecoder;
 import dev.omialien.voicechat_recording.VoiceChatRecording;
 import dev.omialien.voicechat_recording.configs.RecordingCommonConfig;
-import dev.omialien.voicechat_recording.voicechat.events.AudioRecordedEvent;
+import dev.omialien.voicechat_recording_api.events.AudioRecordedEvent;
+import dev.omialien.voicechat_recording_api.IRecordedPlayer;
 import net.neoforged.neoforge.common.NeoForge;
 
 import java.util.UUID;
