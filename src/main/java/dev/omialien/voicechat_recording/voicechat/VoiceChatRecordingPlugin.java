@@ -13,7 +13,6 @@ import dev.omialien.voicechat_recording.voicechat.events.AudioLoadedEvent;
 import dev.omialien.voicechat_recording.voicechat.events.MicPacketReceivedEvent;
 import dev.omialien.voicechat_recording.voicechat.events.RecordingSetupEvent;
 import net.neoforged.neoforge.common.NeoForge;
-import org.apache.commons.lang3.NotImplementedException;
 import org.jetbrains.annotations.ApiStatus;
 
 import javax.annotation.Nullable;
@@ -23,6 +22,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 @ForgeVoicechatPlugin
@@ -39,11 +39,12 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin {
     public static TaskScheduler audioSavingTask;
     private static boolean audioSavingTaskScheduled = false;
     // TODO audio saving cooldown config
-    private static final long audioSaveCooldown = 15 * 20;
+    private static final long audioSaveCooldown = 15 * 20; // 15 seconds for debug
     private static Thread audioSavingThread;
 
-    private static void createThread() {
-        // TODO maybe instead of this make a separate thread that is always running while in a server
+    // TODO delete audio files that aren't saved by any namespace
+    private static void createAudioSavingThread() {
+        // TODO maybe instead of creating a thread every time make a separate thread that is always running while in a server
         VoiceChatRecording.LOGGER.debug("Recreating saving thread");
         audioSavingThread = new Thread(() -> {
             VoiceChatRecording.LOGGER.debug("Running saving thread");
@@ -62,7 +63,7 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin {
                     PrintWriter writer = new PrintWriter(namespacePath.toFile());
                     writer.println(gson.toJson(audioIds.stream().map((audio) -> new Pair<>(audio.getFirst(), audio.getSecond())).collect(Collectors.toSet())));
                     writer.close();
-                    VoiceChatRecording.LOGGER.debug("Wrote {}.json", namespace);
+                    VoiceChatRecording.LOGGER.debug("Wrote namespace file {}.json", namespace);
                 } catch (IOException e) {
                     VoiceChatRecording.LOGGER.error("Couldn't save json file for namespace {}!", namespace);
                     VoiceChatRecording.LOGGER.error("{}", e.getMessage());
@@ -146,7 +147,7 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin {
                 }
                 savedAudiosCache.get(pair.getFirst()).add(pair.getSecond());
             }
-            createThread();
+            createAudioSavingThread();
             audioSavingThread.start();
         }
         // Thread is running, wait for it to finish
@@ -173,7 +174,7 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin {
         audioSavingTask = new TaskScheduler();
         audioSavingTaskScheduled = false;
         audioLoader = Executors.newFixedThreadPool(4);
-        createThread();
+        createAudioSavingThread();
         if(audioSavingThread != null && audioSavingThread.isAlive()){
             try {
                 VoiceChatRecording.LOGGER.debug("joining saving thread");
@@ -191,7 +192,7 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin {
             VoiceChatRecording.LOGGER.warn("Tried to save audios while thread was started: trying again in 5 minutes");
             audioSavingTask.schedule(VoiceChatRecordingPlugin::saveAudios, audioSaveCooldown);
         } else {
-            createThread();
+            createAudioSavingThread();
             audioSavingThread.start();
         }
     }
@@ -263,7 +264,6 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin {
     public enum LoadType {
         SINGLE,
         ALL_FROM_USER,
-        ALL,
         // TODO allow events to identify from which namespace the audio was loaded
         NAMESPACE
     }
@@ -273,48 +273,63 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin {
     // quickly retrieve already-loaded audios, not actually load them
     private static Map<Pair<UUID, UUID>, Future<RecordedAudio>> audioLoadingCache = new ConcurrentHashMap<>();
     // TODO this is currently tied to the game TPS, maybe make this a thread that's always running
-    // and just sleep it to act as the cooldown
-    // Ending it early because of game shutdown is no problem as loading won't be needed in that case anyway
+    // and just sleep it to act as the cooldown;
+    // Ending it early because of game shutdown is no problem as loading won't be needed in that case anyway, only saving.
+    // Being a task scheduler also means there's a risk of removing an audio that's already been removed
+    // if it's somehow cached twice, and it's impossible to stop an audio from being removed after the initial
+    // scheduling so audios being constantly used won't stop them from being removed
+    // TODO implement removing from cache
     public static TaskScheduler audioLoadingCacheRemovalTasks = new TaskScheduler();
-    private static Future<RecordedAudio> loadRawAudio(Pair<UUID, UUID> ids, LoadType type) {
-        Path audioPath = RecordedAudio.audiosPath.resolve(ids.getFirst().toString() + "+" + ids.getSecond().toString() + ".pcm");
+
+    private static RecordedAudio readAudioFromFile(Path audioPath, Consumer<RecordedAudio> reaction, Pair<UUID, UUID> ids, LoadType type) {
+        File audioFile = audioPath.toFile();
+        try (DataInputStream dis = new DataInputStream(new FileInputStream(audioFile))) {
+            short[] audio = new short[(int)(audioFile.length() / 2)];
+            for(int i = 0; i < audioFile.length() / 2; i++) {
+                audio[i] = dis.readShort();
+            }
+            RecordedAudio recordedAudio = new RecordedAudio(audio, ids.getFirst(), ids.getSecond());
+            NeoForge.EVENT_BUS.post(new AudioLoadedEvent(recordedAudio, type));
+            reaction.accept(recordedAudio);
+            return recordedAudio;
+        } catch (FileNotFoundException e) {
+            throw new RuntimeException(e);
+        } catch (IOException e) {
+            VoiceChatRecording.LOGGER.error("Error loading audio: {}", audioPath);
+            VoiceChatRecording.LOGGER.error("{}", e.getMessage());
+            reaction.accept(null);
+        }
+        return null;
+    }
+
+    @Nullable
+    private static Future<RecordedAudio> loadRawAudio(Pair<UUID, UUID> ids, LoadType type, Consumer<RecordedAudio> reaction) {
+        Path audioPath = RecordedAudio.audiosPath.resolve(RecordedAudio.getFileName(ids.getFirst(), ids.getSecond()));
         if(!Files.exists(audioPath)) {
             VoiceChatRecording.LOGGER.error("Tried to load non-existent audio {}", audioPath);
             return null;
         }
         // Check the cache immediately before filling it
+        VoiceChatRecording.LOGGER.debug("Checking cache...");
         if(audioLoadingCache.containsKey(ids)) {
             return audioLoadingCache.get(ids);
         }
-        audioLoadingCache.put(ids, null);
-        Future<RecordedAudio> res = audioLoader.submit(() -> {
-            File audioFile = audioPath.toFile();
-            try (DataInputStream dis = new DataInputStream(new FileInputStream(audioFile))) {
-                short[] audio = new short[(int)(audioFile.length() / 2)];
-                for(int i = 0; i < audioFile.length() / 2; i++) {
-                    audio[i] = dis.readShort();
-                }
-                RecordedAudio recordedAudio = new RecordedAudio(audio, ids.getFirst(), ids.getSecond());
-                NeoForge.EVENT_BUS.post(new AudioLoadedEvent(recordedAudio, type));
-                return recordedAudio;
-            } catch (FileNotFoundException e) {
-                throw new RuntimeException(e);
-            } catch (IOException e) {
-                VoiceChatRecording.LOGGER.error("Error loading audio: {}", audioPath);
-                VoiceChatRecording.LOGGER.error("{}", e.getMessage());
-            }
-            return null;
-        });
-        audioLoadingCache.put(ids, res);
-        return res;
+        audioLoadingCache.put(ids, audioLoader.submit(() -> VoiceChatRecordingPlugin.readAudioFromFile(audioPath, reaction, ids, type)));
+        VoiceChatRecording.LOGGER.debug("Not in cache, added");
+        return audioLoadingCache.get(ids);
+    }
+
+    private static Future<RecordedAudio> loadRawAudio(Pair<UUID, UUID> ids, LoadType type){
+        return loadRawAudio(ids, type, (audio) -> {});
     }
 
     /**
-     * Loads all audios from the given namespace from disk
-     * @param namespace the namespace to identify loaded audios
+     * Loads all audios of the given namespace from disk, passing them to {@param reaction}
+     * @param namespace the namespace to identify audios to load
+     * @param reaction a consumer to react to the loaded {@link RecordedAudio}; if an error occurs, the audio will be null
      * @return a list of futures of the loaded audios
      */
-    public static List<Future<RecordedAudio>> loadNamespaceAudios(String namespace) {
+    public static List<Future<RecordedAudio>> loadNamespaceAudios(String namespace, Consumer<RecordedAudio> reaction) {
         if(!savedAudios.containsKey(namespace)) {
             VoiceChatRecording.LOGGER.warn("Tried to load from non-existent namespace {}", namespace);
             return Collections.emptyList();
@@ -328,30 +343,74 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin {
     }
 
     /**
+     * Loads all audios of the given namespace from disk
+     * @param namespace the namespace to identify audios to load
+     * @return a list of futures of the loaded audios. If an error occurs, the audio will be null
+     * Also see {@link VoiceChatRecordingPlugin#loadNamespaceAudios(String, Consumer)}
+     */
+    public static List<Future<RecordedAudio>> loadNamespaceAudios(String namespace) {
+        return loadNamespaceAudios(namespace, (audio) -> {});
+    }
+
+    /**
      * Gets the identifiers of all the audios saved by a specific namespace
      * This doesn't actually load the audios from disk, use
-     * {@link VoiceChatRecordingPlugin#loadNamespaceAudios(String)} or {@link VoiceChatRecordingPlugin#loadAudio(UUID, UUID)}
+     * {@link VoiceChatRecordingPlugin#loadNamespaceAudios(String, Consumer)} or {@link VoiceChatRecordingPlugin#loadAudio(UUID, UUID)} for that
      * @param namespace the namespace to retrieve audios from
-     * @return a set of all the identifiers of the audios from the given namespace
+     * @return a set of all the identifiers of the audios saved to the given namespace
      */
     public static Set<Pair<UUID, UUID>> getNamespaceAudios(String namespace) {
         return Collections.unmodifiableSet(savedAudios.getOrDefault(namespace, Collections.emptySet()));
     }
 
     /**
+     * Loads an audio and returns a {@link Future} which will return the audio, also passing the loaded audio to {@param reaction}
+     * @param playerUuid the uuid of the player to load the audio for
+     * @param audioId the uuid of the audio to load
+     * @param reaction a consumer that will receive the loaded audio
+     * @return a future which will return the loaded audio or null if an error occurs
+     */
+    public Future<RecordedAudio> loadAudio(UUID playerUuid, UUID audioId, Consumer<RecordedAudio> reaction) {
+        // TODO, remember to check and add to cache
+        return loadRawAudio(new Pair<>(playerUuid, audioId), LoadType.SINGLE, reaction);
+    }
+
+    /**
      * Loads an audio and returns a Future which will return the audio
      * @param playerUuid the uuid of the player to load the audio for
      * @param audioId the uuid of the audio to load
-     * @return A future which will return the loaded audio (or null)
+     * @return a future which will return the loaded audio or null if an error occurs
      */
     public Future<RecordedAudio> loadAudio(UUID playerUuid, UUID audioId){
-        // TODO, remember to check and add to cache
-        throw new NotImplementedException();
+        return loadAudio(playerUuid, audioId, (audio) -> {});
     }
 
-    public static void loadPlayerAudios(UUID playerUuid){
-        // TODO, remember to check and add to cache
-        throw new NotImplementedException();
+    /**
+     * Loads all available audios of a given player and passes them to the given consumer
+     * @param playerUuid The UUID of the player to load audios of
+     * @param reaction The reaction to pass the audio to
+     * @return a list of futures which will return either the loaded audios or null if an error occurred
+     */
+    public static List<Future<RecordedAudio>> loadPlayerAudios(UUID playerUuid, Consumer<RecordedAudio> reaction) {
+        // Assume 50 audios per namespace for pre-allocating memory
+        List<Future<RecordedAudio>> loadedAudios = new ArrayList<>(savedAudios.keySet().size() * 50);
+        for(Set<Pair<UUID, UUID>> audios : savedAudios.values()) {
+            for(Pair<UUID, UUID> audio : audios) {
+                if(audio.getFirst().equals(playerUuid)) {
+                    loadedAudios.add(loadRawAudio(audio, LoadType.ALL_FROM_USER, reaction));
+                }
+            }
+        }
+        return loadedAudios;
+    }
+
+    /**
+     * Loads all available audios of a given player
+     * @param playerUuid the UUID of the player to get audios of
+     * @return a list of futures which will return either the player's audio or null if an error occured
+     */
+    public static List<Future<RecordedAudio>> loadPlayerAudios(UUID playerUuid){
+        return loadPlayerAudios(playerUuid, (audio) -> {});
     }
 
     private void onPlayerConnected(PlayerConnectedEvent e){

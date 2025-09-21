@@ -154,6 +154,10 @@ public class RecordedAudio implements IRecordedAudio {
     }
 
     public String fileName() {
-        return String.format("%s+%s.pcm", this.getPlayerUUID().toString(), this.getId().toString());
+        return RecordedAudio.getFileName(this.getPlayerUUID(), this.getId());
+    }
+
+    public static String getFileName(UUID playerUuid, UUID audioId) {
+        return String.format("%s+%s.pcm", playerUuid.toString(), audioId.toString());
     }
 }
