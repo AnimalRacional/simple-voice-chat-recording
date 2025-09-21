@@ -51,11 +51,16 @@ public class RecordedAudio implements IRecordedAudio {
     @Override
     public void saveAudio(String namespace){
         if(!VoiceChatRecording.recordingApi.getPrivacy(this.player) && !saved){ // This method should only ever happen once per RecordedPlayer, no more no less
-            VoiceChatRecording.recordingApi.saveAudio(namespace, this);
+            ((VoiceChatRecordingPlugin)VoiceChatRecording.recordingApi).saveAudio(namespace, this);
             this.saved = true;
         } else if(saved){
             VoiceChatRecording.LOGGER.warn("Tried to save already-saved audio! {} by {}", getId(), getPlayerUUID());
         }
+    }
+
+    @Override
+    public void unsaveAudio(String namespace) {
+        ((VoiceChatRecordingPlugin)VoiceChatRecording.recordingApi).unsaveAudio(namespace, this);
     }
 
     @Override

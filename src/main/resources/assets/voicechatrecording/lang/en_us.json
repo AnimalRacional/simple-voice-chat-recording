@@ -8,6 +8,12 @@
   "voicechatrecording.configuration.readingThreadCount": "Audio Reading Thread Count",
   "voicechatrecording.configuration.silenceThreshold.tooltip": "Amplitude threshold to detect speech. Change this if your voice is detected even when you're not speaking",
   "voicechatrecording.configuration.readingThreadCount.tooltip": "How many threads are used to read the saved audios from a player that joins the server. Lower this if a player joining the server lags, and raise it if it doesn't but audio reading is too slow.",
+  "voicechatrecording.configuration.audioSavingCooldown": "Audio Saving Cooldown",
+  "voicechatrecording.configuration.audioSavingCooldown.tooltip": "Amount of ticks to wait after an audio is saved to write it to disk",
+  "voicechatrecording.configuration.cacheRemovalTime": "Cache Removal Time",
+  "voicechatrecording.configuration.cacheRemovalTime.tooltip": "How long, in milliseconds, an audio loaded from disk stays in cache. Higher means more memory usage, but faster when loading the same audio repeatedly",
+  "voicechatrecording.configuration.cacheCheckInterval": "Cache Check Interval",
+  "voicechatrecording.configuration.cacheCheckInterval.tooltip": "How long, in seconds, the cache will wait between checking cached audios to remove old ones.",
 
   "voicechatrecording.configuration.section.voicechatrecording.client.toml.title": "Voice Chat Recording Client Configs",
   "voicechatrecording.configuration.section.voicechatrecording.client.toml": "Voice Chat Recording Client Configs",

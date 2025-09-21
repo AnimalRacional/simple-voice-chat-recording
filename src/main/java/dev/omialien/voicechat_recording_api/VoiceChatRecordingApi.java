@@ -10,7 +10,6 @@ import java.util.concurrent.Future;
 import java.util.function.Consumer;
 
 public interface VoiceChatRecordingApi {
-    void saveAudio(String namespace, RecordedAudio audio);
     List<Future<RecordedAudio>> loadNamespaceAudios(String namespace, Consumer<RecordedAudio> reaction);
     List<Future<RecordedAudio>> loadNamespaceAudios(String namespace);
     Set<Pair<UUID, UUID>> getNamespaceAudios(String namespace);
@@ -20,6 +19,5 @@ public interface VoiceChatRecordingApi {
     List<Future<RecordedAudio>> loadPlayerAudios(UUID playerUuid);
     IRecordedPlayer getRecordedPlayer(UUID uuid);
     boolean getPrivacy(UUID uuid);
-
 
 }

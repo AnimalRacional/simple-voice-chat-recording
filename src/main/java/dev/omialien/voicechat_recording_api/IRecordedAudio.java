@@ -40,6 +40,12 @@ public interface IRecordedAudio {
      * @param namespace this should usually be your mod id
      */
     void saveAudio(String namespace);
+    // TODO command for this
+    /**
+     * Marks this audio as no longer persistent through server shutdowns
+     * @param namespace this should usually be your mod id
+     */
+    void unsaveAudio(String namespace);
     /**
      * Gets the underlying audio with the applied effects
      * @param effects the effects applied to the audio

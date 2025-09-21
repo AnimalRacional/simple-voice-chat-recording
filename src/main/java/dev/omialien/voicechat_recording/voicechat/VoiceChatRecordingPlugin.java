@@ -9,6 +9,7 @@ import de.maxhenkel.voicechat.api.events.*;
 import dev.omialien.voicechat_recording.VoiceChatRecording;
 import dev.omialien.voicechat_recording.configs.RecordingCommonConfig;
 import dev.omialien.voicechat_recording.taskscheduler.TaskScheduler;
+import dev.omialien.voicechat_recording.voicechat.audio.AudioCache;
 import dev.omialien.voicechat_recording_api.IRecordedPlayer;
 import dev.omialien.voicechat_recording_api.VoiceChatRecordingApi;
 import dev.omialien.voicechat_recording_api.events.AudioLoadedEvent;
@@ -35,13 +36,12 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin, VoiceChatRecor
     private ExecutorService audioLoader;
     private Map<String, Set<Pair<UUID, UUID>>> savedAudios;
     private Map<String, Set<RecordedAudio>> savedAudiosCache;
-    // TODO is this queue really needed? check if the concurrenthashmap can handle both the saving thread removing audios and adding new audios
+    // TODO is this queue really needed? check if the concurrenthashmap can handle both the saving thread removing audios, and mods adding new audios
     private Queue<Pair<String, RecordedAudio>> audiosToSave;
     public TaskScheduler audioSavingTask;
     private boolean audioSavingTaskScheduled = false;
-    // TODO audio saving cooldown config
-    private final long audioSaveCooldown = 15 * 20; // 15 seconds for debug
     private Thread audioSavingThread;
+    private AudioCache audioCache;
 
     // TODO delete audio files that aren't saved by any namespace
     private void createAudioSavingThread() {
@@ -62,9 +62,10 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin, VoiceChatRecor
                     Path namespacePath = basePath.resolve(String.format("%s.json", namespace));
                     Files.deleteIfExists(namespacePath);
                     PrintWriter writer = new PrintWriter(namespacePath.toFile());
-                    writer.println(gson.toJson(audioIds.stream().map((audio) -> new Pair<>(audio.getFirst(), audio.getSecond())).collect(Collectors.toSet())));
+                    Set<Pair<UUID, UUID>> audios = audioIds.stream().map((audio) -> new Pair<>(audio.getFirst(), audio.getSecond())).collect(Collectors.toSet());
+                    writer.println(gson.toJson(audios));
                     writer.close();
-                    VoiceChatRecording.LOGGER.debug("Wrote namespace file {}.json", namespace);
+                    VoiceChatRecording.LOGGER.debug("Wrote namespace file {}.json with {} audios", namespace, audios.size());
                 } catch (IOException e) {
                     VoiceChatRecording.LOGGER.error("Couldn't save json file for namespace {}!", namespace);
                     VoiceChatRecording.LOGGER.error("{}", e.getMessage());
@@ -115,7 +116,7 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin, VoiceChatRecor
             while(!audiosToSave.isEmpty()) {
                 if(!audioSavingTaskScheduled){
                     audioSavingTaskScheduled = true;
-                    audioSavingTask.schedule(this::saveAudios, audioSaveCooldown);
+                    audioSavingTask.schedule(this::saveAudios, RecordingCommonConfig.AUDIO_SAVING_COOLDOWN.get());
                 }
                 Pair<String, RecordedAudio> pair = audiosToSave.remove();
                 if(!savedAudiosCache.containsKey(pair.getFirst())) {
@@ -162,6 +163,8 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin, VoiceChatRecor
     @Override
     public void initialize(VoicechatApi api) {
         VoiceChatRecording.recordingApi = this;
+        if(audioCache != null) audioCache.interruptThread();
+        audioCache = new AudioCache();
         if(api instanceof VoicechatServerApi napi){
             VoiceChatRecording.LOGGER.info("Server Voice Chat API");
             VoiceChatRecording.vcApi = napi;
@@ -212,14 +215,13 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin, VoiceChatRecor
     private void saveAudios() {
         if(audioSavingThread.isAlive()) {
             VoiceChatRecording.LOGGER.warn("Tried to save audios while thread was started: trying again in 5 minutes");
-            audioSavingTask.schedule(this::saveAudios, audioSaveCooldown);
+            audioSavingTask.schedule(this::saveAudios, RecordingCommonConfig.AUDIO_SAVING_COOLDOWN.get());
         } else {
             createAudioSavingThread();
             audioSavingThread.start();
         }
     }
 
-    @Override
     public void saveAudio(String namespace, RecordedAudio audio){
         if(audioSavingThread.isAlive()) {
             // Thread is running, so we shouldn't mess with the hashmap, or we risk blocking here until it finishes saving
@@ -238,7 +240,13 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin, VoiceChatRecor
         if(!audioSavingTaskScheduled){
             audioSavingTaskScheduled = true;
             VoiceChatRecording.LOGGER.info("Audios will be saved in 5 minutes");
-            audioSavingTask.schedule(this::saveAudios, audioSaveCooldown);
+            audioSavingTask.schedule(this::saveAudios, RecordingCommonConfig.AUDIO_SAVING_COOLDOWN.get());
+        }
+    }
+
+    public void unsaveAudio(String namespace, RecordedAudio audio) {
+        if(savedAudios.containsKey(namespace)) {
+            savedAudios.get(namespace).remove(new Pair<>(audio.getPlayerUUID(), audio.getId()));
         }
     }
 
@@ -291,19 +299,6 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin, VoiceChatRecor
         NAMESPACE
     }
 
-    // This should be fine to not reset between worlds, as even in different worlds
-    // there shouldn't be 2 audios with the same UUIDs and this is only used to
-    // quickly retrieve already-loaded audios, not actually load them
-    private Map<Pair<UUID, UUID>, Future<RecordedAudio>> audioLoadingCache = new ConcurrentHashMap<>();
-    // TODO this is currently tied to the game TPS, maybe make this a thread that's always running
-    // and just sleep it to act as the cooldown;
-    // Ending it early because of game shutdown is no problem as loading won't be needed in that case anyway, only saving.
-    // Being a task scheduler also means there's a risk of removing an audio that's already been removed
-    // if it's somehow cached twice, and it's impossible to stop an audio from being removed after the initial
-    // scheduling so audios being constantly used won't stop them from being removed
-    // TODO implement removing from cache
-    public TaskScheduler audioLoadingCacheRemovalTasks = new TaskScheduler();
-
     private RecordedAudio readAudioFromFile(Path audioPath, Consumer<RecordedAudio> reaction, Pair<UUID, UUID> ids, LoadType type) {
         File audioFile = audioPath.toFile();
         try (DataInputStream dis = new DataInputStream(new FileInputStream(audioFile))) {
@@ -334,12 +329,12 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin, VoiceChatRecor
         }
         // Check the cache immediately before filling it
         VoiceChatRecording.LOGGER.debug("Checking cache...");
-        if(audioLoadingCache.containsKey(ids)) {
-            return audioLoadingCache.get(ids);
+        if(audioCache.isCached(ids)) {
+            return audioCache.get(ids);
         }
-        audioLoadingCache.put(ids, audioLoader.submit(() -> this.readAudioFromFile(audioPath, reaction, ids, type)));
+        audioCache.add(ids, audioLoader.submit(() -> this.readAudioFromFile(audioPath, reaction, ids, type)));
         VoiceChatRecording.LOGGER.debug("Not in cache, added");
-        return audioLoadingCache.get(ids);
+        return audioCache.get(ids);
     }
 
     private Future<RecordedAudio> loadRawAudio(Pair<UUID, UUID> ids, LoadType type){
@@ -448,6 +443,10 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin, VoiceChatRecor
         RecordedPlayer player = new RecordedPlayer(playerUuid);
         recordedPlayers.put(playerUuid, player);
         startRecording(playerUuid);
+        // TODO remove this, it's for debug
+        loadPlayerAudios(e.getConnection().getPlayer().getUuid(), (audio) -> {
+            VoiceChatRecording.LOGGER.debug("REACTION:{} {}", audio.getId(), audio.getDuration());
+        });
     }
 
     private void onPlayerDisconnected(PlayerDisconnectedEvent e){

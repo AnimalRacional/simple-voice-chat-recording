@@ -4,6 +4,7 @@ import dev.omialien.voicechat_recording.VoiceChatRecording;
 import dev.omialien.voicechat_recording.commands.*;
 import dev.omialien.voicechat_recording.networking.PrivacyModePacket;
 import dev.omialien.voicechat_recording.networking.ServerPayloadHandler;
+import dev.omialien.voicechat_recording.taskscheduler.TaskScheduler;
 import dev.omialien.voicechat_recording_api.IRecordedAudio;
 import dev.omialien.voicechat_recording.voicechat.RecordedAudio;
 import dev.omialien.voicechat_recording.voicechat.VoiceChatRecordingPlugin;
@@ -69,8 +70,10 @@ public class CommonEventBus {
     @SubscribeEvent
     public static void tickEvent(ServerTickEvent.Post event){
         VoiceChatRecording.TASKS.tick();
-        ((VoiceChatRecordingPlugin)(VoiceChatRecording.recordingApi)).audioSavingTask.tick();
-        ((VoiceChatRecordingPlugin)(VoiceChatRecording.recordingApi)).audioLoadingCacheRemovalTasks.tick();
+        TaskScheduler scheduler = ((VoiceChatRecordingPlugin)(VoiceChatRecording.recordingApi)).audioSavingTask;
+        if(scheduler != null) {
+            scheduler.tick();
+        }
     }
 
     @SubscribeEvent
@@ -95,10 +98,10 @@ public class CommonEventBus {
 
     @SubscribeEvent
     public static void onLoadedAudio(AudioLoadedEvent event){
-        VoiceChatRecording.LOGGER.debug("EVENT: Audio loaded! {} {}", event.getAudio().getPlayerUUID(), event.getAudio().getId());
+        VoiceChatRecording.LOGGER.debug("EVENT: Audio loaded! {} {} {}", event.getAudio().getFilterResult(), event.getAudio().getPlayerUUID(), event.getAudio().getId());
         // TODO add shouldRemember check
         if(event.getAudio().getFilterResult() == RecordedAudio.FilterResult.PASSED){
-            VoiceChatRecording.LOGGER.debug("EVENT: Audio recorded! Filter result: {}", event.getAudio().getFilterResult());
+            VoiceChatRecording.LOGGER.debug("EVENT: saving loaded audio! Filter result: {}", event.getAudio().getFilterResult());
             VoiceChatRecording.storedAudios.add(event.getAudio());
         }
     }
