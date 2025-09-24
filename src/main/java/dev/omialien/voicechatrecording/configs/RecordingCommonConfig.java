@@ -8,6 +8,8 @@ public class RecordingCommonConfig {
             .define("silenceThreshold", 700);
     public static final ModConfigSpec.ConfigValue<Integer> AUDIO_READER_THREAD_COUNT = BUILDER
         .define("readingThreadCount", 4);
+    public static final ModConfigSpec.ConfigValue<Integer> AUDIO_SAVER_THREAD_COUNT = BUILDER
+            .define("saveThreadCount", 4);
     public static final ModConfigSpec.ConfigValue<Integer> AUDIO_SAVING_COOLDOWN = BUILDER
             .define("audioSavingCooldown", 5 * 60 * 20);
     public static final ModConfigSpec.ConfigValue<Integer> CACHE_REMOVAL_TIME = BUILDER

@@ -36,7 +36,7 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin, VoiceChatRecor
     private Map<UUID, Boolean> privacyMode;
     private ExecutorService audioLoader;
     private Map<String, Set<Pair<UUID, UUID>>> savedAudios;
-    private Map<String, Set<RecordedAudio>> savedAudiosCache;
+    private Map<String, Set<RecordedAudio>> audiosToWriteToDisk;
     // TODO is this queue really needed? check if the concurrenthashmap can handle both the saving thread removing audios, and mods adding new audios
     private Queue<Pair<String, RecordedAudio>> audiosToSave;
     public TaskScheduler audioSavingTask;
@@ -44,14 +44,12 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin, VoiceChatRecor
     private Thread audioSavingThread;
     private AudioCache audioCache;
 
-    // TODO delete audio files that aren't saved by any namespace
     private void createAudioSavingThread() {
         // TODO maybe instead of creating a thread every time make a separate thread that is always running while in a server
         VoiceChatRecording.LOGGER.debug("Recreating saving thread");
         audioSavingThread = new Thread(() -> {
             VoiceChatRecording.LOGGER.debug("Running saving thread");
-            // TODO change config name, or create 2 different configs for reader and saver
-            ExecutorService savePool = Executors.newFixedThreadPool(RecordingCommonConfig.AUDIO_READER_THREAD_COUNT.get());
+            ExecutorService savePool = Executors.newFixedThreadPool(RecordingCommonConfig.AUDIO_SAVER_THREAD_COUNT.get());
             Path basePath = RecordedAudio.audiosPath;
             long start = System.nanoTime();
             for(String namespace : savedAudios.keySet()) {
@@ -72,11 +70,11 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin, VoiceChatRecor
                     VoiceChatRecording.LOGGER.error("{}", e.getMessage());
                 }
                 // Save the audio files
-                if(!savedAudiosCache.containsKey(namespace)){
+                if(!audiosToWriteToDisk.containsKey(namespace)){
                     VoiceChatRecording.LOGGER.debug("No new audios to save for {}", namespace);
                     continue;
                 }
-                Set<RecordedAudio> audios = savedAudiosCache.get(namespace);
+                Set<RecordedAudio> audios = audiosToWriteToDisk.get(namespace);
                 for(RecordedAudio audio : audios) {
                     Path audioPath = basePath.resolve(audio.fileName());
                     if(!Files.exists(audioPath)) {
@@ -112,7 +110,7 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin, VoiceChatRecor
             savePool.close();
             long end = System.nanoTime();
             VoiceChatRecording.LOGGER.info("Finished saving audios in {}ms", (double)(end-start)/1000000);
-            savedAudiosCache.clear();
+            audiosToWriteToDisk.clear();
             audioSavingTaskScheduled = false;
             while(!audiosToSave.isEmpty()) {
                 if(!audioSavingTaskScheduled){
@@ -120,10 +118,10 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin, VoiceChatRecor
                     audioSavingTask.schedule(this::saveAudios, RecordingCommonConfig.AUDIO_SAVING_COOLDOWN.get());
                 }
                 Pair<String, RecordedAudio> pair = audiosToSave.remove();
-                if(!savedAudiosCache.containsKey(pair.getFirst())) {
-                    savedAudiosCache.put(pair.getFirst(), new HashSet<>());
+                if(!audiosToWriteToDisk.containsKey(pair.getFirst())) {
+                    audiosToWriteToDisk.put(pair.getFirst(), new HashSet<>());
                 }
-                savedAudiosCache.get(pair.getFirst()).add(pair.getSecond());
+                audiosToWriteToDisk.get(pair.getFirst()).add(pair.getSecond());
             }
             Set<Pair<UUID, UUID>> allAudios = new HashSet<>();
             savedAudios.values().forEach(allAudios::addAll);
@@ -159,10 +157,10 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin, VoiceChatRecor
             // Move all queued audios to the main map and run the thread on the main thread
             while(!audiosToSave.isEmpty()) {
                 Pair<String, RecordedAudio> pair = audiosToSave.remove();
-                if(!savedAudiosCache.containsKey(pair.getFirst())) {
-                    savedAudiosCache.put(pair.getFirst(), new HashSet<>());
+                if(!audiosToWriteToDisk.containsKey(pair.getFirst())) {
+                    audiosToWriteToDisk.put(pair.getFirst(), new HashSet<>());
                 }
-                savedAudiosCache.get(pair.getFirst()).add(pair.getSecond());
+                audiosToWriteToDisk.get(pair.getFirst()).add(pair.getSecond());
             }
             createAudioSavingThread();
             audioSavingThread.start();
@@ -187,12 +185,12 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin, VoiceChatRecor
         } else {
             VoiceChatRecording.LOGGER.info("Client Voice Chat API");
         }
-        savedAudiosCache = new HashMap<>();
-        savedAudios = new HashMap<>();
+        audiosToWriteToDisk = new ConcurrentHashMap<>();
+        savedAudios = new ConcurrentHashMap<>();
         audiosToSave = new ConcurrentLinkedQueue<>();
         audioSavingTask = new TaskScheduler();
         audioSavingTaskScheduled = false;
-        audioLoader = Executors.newFixedThreadPool(4);
+        audioLoader = Executors.newFixedThreadPool(RecordingCommonConfig.AUDIO_READER_THREAD_COUNT.get());
         createAudioSavingThread();
         if(audioSavingThread != null && audioSavingThread.isAlive()){
             try {
@@ -249,10 +247,10 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin, VoiceChatRecor
             audiosToSave.add(new Pair<>(namespace, audio));
         } else {
             VoiceChatRecording.LOGGER.debug("adding saved audio to map");
-            if(!savedAudiosCache.containsKey(namespace)) {
-                savedAudiosCache.put(namespace, new HashSet<>());
+            if(!audiosToWriteToDisk.containsKey(namespace)) {
+                audiosToWriteToDisk.put(namespace, new HashSet<>());
             }
-            savedAudiosCache.get(namespace).add(audio);
+            audiosToWriteToDisk.get(namespace).add(audio);
         }
         if(!audioSavingTaskScheduled){
             audioSavingTaskScheduled = true;
@@ -263,7 +261,7 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin, VoiceChatRecor
     }
 
     public void unsaveAudio(String namespace, RecordedAudio audio) {
-        // TODO if this is called before the audio gets written to disk, since it is still in savedAudiosCache it will still be written to disk, although it'll be deleted right afterwards if no other namespace saves it
+        // TODO if this is called before the audio gets written to disk, since it is still in audiosToWriteToDisk it will still be written to disk, although it'll be deleted right afterwards if no other namespace saves it
         //  We can't just remove it from there since it's possible some other namespace also saved it, so is it worth it dealing with this edge case?
         if(savedAudios.containsKey(namespace)) {
             savedAudios.get(namespace).remove(new Pair<>(audio.getPlayerUUID(), audio.getId()));
@@ -315,11 +313,10 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin, VoiceChatRecor
     public enum LoadType {
         SINGLE,
         ALL_FROM_USER,
-        // TODO allow events to identify from which namespace the audio was loaded
         NAMESPACE
     }
 
-    private RecordedAudio readAudioFromFile(Path audioPath, Consumer<RecordedAudio> reaction, Pair<UUID, UUID> ids, LoadType type) {
+    private RecordedAudio readAudioFromFile(Path audioPath, Consumer<RecordedAudio> reaction, Pair<UUID, UUID> ids) {
         if(!Files.exists(audioPath)) {
             VoiceChatRecording.LOGGER.error("Tried to load non-existent audio {}", audioPath);
             reaction.accept(null);
@@ -332,7 +329,6 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin, VoiceChatRecor
                 audio[i] = dis.readShort();
             }
             RecordedAudio recordedAudio = new RecordedAudio(audio, ids.getFirst(), ids.getSecond());
-            NeoForge.EVENT_BUS.post(new AudioLoadedEvent(recordedAudio, type));
             reaction.accept(recordedAudio);
             return recordedAudio;
         } catch (FileNotFoundException e) {
@@ -346,14 +342,14 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin, VoiceChatRecor
     }
 
     @Nullable
-    private Future<RecordedAudio> loadRawAudio(Pair<UUID, UUID> ids, LoadType type, Consumer<RecordedAudio> reaction) {
+    private Future<RecordedAudio> loadRawAudio(Pair<UUID, UUID> ids, LoadType type, Consumer<RecordedAudio> reaction, String namespace) {
         Path audioPath = RecordedAudio.audiosPath.resolve(RecordedAudio.getFileName(ids.getFirst(), ids.getSecond()));
         // Check the cache immediately before filling it
         VoiceChatRecording.LOGGER.debug("Checking cache...");
         // Check the savedAudiosCache, since if it's in there it most likely hasn't been written to disk
         RecordedAudio id = RecordedAudio.makeIdentificationAudio(ids.getFirst(), ids.getSecond());
         AtomicReference<RecordedAudio> found = new AtomicReference<>(null);
-        savedAudiosCache.values().forEach((set) -> {
+        audiosToWriteToDisk.values().forEach((set) -> {
             // You can check if an element is in a set, but not retrieve it
             if(set.contains(id)) {
                 for(RecordedAudio audio : set) {
@@ -368,15 +364,36 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin, VoiceChatRecor
             return audioLoader.submit(found::get);
         }
         if(audioCache.isCached(ids)) {
-            return audioCache.get(ids);
+            Future<RecordedAudio> cached = audioCache.get(ids);
+            if(cached.state() == Future.State.SUCCESS){
+                try{
+                    NeoForge.EVENT_BUS.post(new AudioLoadedEvent(cached.get(), type, namespace));
+                } catch(Exception e) {
+                    VoiceChatRecording.LOGGER.error("Error getting successfully finished audio from cache to event: {} {}", ids.getFirst(), ids.getSecond());
+                    VoiceChatRecording.LOGGER.error("{}", e.getMessage());
+                }
+            }
+            return cached;
         }
-        audioCache.add(ids, audioLoader.submit(() -> this.readAudioFromFile(audioPath, reaction, ids, type)));
+        audioCache.add(ids, audioLoader.submit(() -> {
+            RecordedAudio res = this.readAudioFromFile(audioPath, reaction, ids);
+            NeoForge.EVENT_BUS.post(new AudioLoadedEvent(res, type, namespace));
+            return res;
+        }));
         VoiceChatRecording.LOGGER.debug("Not in cache, added");
         return audioCache.get(ids);
     }
 
-    private Future<RecordedAudio> loadRawAudio(Pair<UUID, UUID> ids, LoadType type){
-        return loadRawAudio(ids, type, (audio) -> {});
+    private Future<RecordedAudio> loadRawAudio(Pair<UUID, UUID> ids, LoadType type, Consumer<RecordedAudio> reaction){
+        return loadRawAudio(ids, type, reaction, "");
+    }
+
+    private Future<RecordedAudio> loadRawAudio(Pair<UUID, UUID> ids, LoadType type, String namespace){
+        return loadRawAudio(ids, type, (audio) -> {}, namespace);
+    }
+
+    private Future<RecordedAudio> loadRawAudio(Pair<UUID, UUID> ids, LoadType type) {
+        return loadRawAudio(ids, type, "");
     }
 
     /**
@@ -394,7 +411,7 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin, VoiceChatRecor
         Set<Pair<UUID, UUID>> toLoad = savedAudios.get(namespace);
         List<Future<RecordedAudio>> loadedAudios = new ArrayList<>(toLoad.size());
         for(Pair<UUID, UUID> cur : toLoad) {
-            loadedAudios.add(loadRawAudio(cur, LoadType.NAMESPACE, reaction));
+            loadedAudios.add(loadRawAudio(cur, LoadType.NAMESPACE, reaction, namespace));
         }
         return loadedAudios;
     }
@@ -431,7 +448,6 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin, VoiceChatRecor
      */
     @Override
     public Future<RecordedAudio> loadAudio(UUID playerUuid, UUID audioId, Consumer<RecordedAudio> reaction) {
-        // TODO, remember to check and add to cache
         return loadRawAudio(new Pair<>(playerUuid, audioId), LoadType.SINGLE, reaction);
     }
 
