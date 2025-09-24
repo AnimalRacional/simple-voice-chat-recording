@@ -396,6 +396,7 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin, VoiceChatRecor
         return loadRawAudio(ids, type, "");
     }
 
+    // TODO move all javadoc comments like this from this class and RecordedPlayer to the api interfaces
     /**
      * Loads all audios of the given namespace from disk, passing them to {@param reaction}
      * @param namespace the namespace to identify audios to load
@@ -498,9 +499,7 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin, VoiceChatRecor
         recordedPlayers.put(playerUuid, player);
         startRecording(playerUuid);
         // TODO remove this, it's for debug
-        loadPlayerAudios(e.getConnection().getPlayer().getUuid(), (audio) -> {
-            VoiceChatRecording.LOGGER.debug("REACTION:{} {}", audio.getId(), audio.getDuration());
-        });
+        loadPlayerAudios(e.getConnection().getPlayer().getUuid(), (audio) -> VoiceChatRecording.LOGGER.debug("REACTION:{} {}", audio.getId(), audio.getDuration()));
     }
 
     private void onPlayerDisconnected(PlayerDisconnectedEvent e){
