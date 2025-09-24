@@ -24,6 +24,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
@@ -124,6 +125,21 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin, VoiceChatRecor
                 }
                 savedAudiosCache.get(pair.getFirst()).add(pair.getSecond());
             }
+            Set<Pair<UUID, UUID>> allAudios = new HashSet<>();
+            savedAudios.values().forEach(allAudios::addAll);
+            try(DirectoryStream<Path> stream = Files.newDirectoryStream(basePath)) {
+                for(Path cur : stream) {
+                    Pair<UUID, UUID> ids = RecordedAudio.getIdFromFile(cur);
+                    if(ids != null) {
+                        if(!allAudios.contains(ids)) {
+                            VoiceChatRecording.LOGGER.info("Deleting unsaved audio file {}", cur);
+                            Files.delete(cur);
+                        }
+                    }
+                }
+            } catch(IOException e) {
+                VoiceChatRecording.LOGGER.error("Couldn't open audio directory for file deletion");
+            }
         });
         audioSavingThread.setName("Audio Saving Thread");
     }
@@ -223,6 +239,10 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin, VoiceChatRecor
     }
 
     public void saveAudio(String namespace, RecordedAudio audio){
+        if(!savedAudios.containsKey(namespace)) {
+            savedAudios.put(namespace, new HashSet<>());
+        }
+        savedAudios.get(namespace).add(new Pair<>(audio.getPlayerUUID(), audio.getId()));
         if(audioSavingThread.isAlive()) {
             // Thread is running, so we shouldn't mess with the hashmap, or we risk blocking here until it finishes saving
             VoiceChatRecording.LOGGER.debug("thread is alive, adding to queue");
@@ -233,18 +253,18 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin, VoiceChatRecor
                 savedAudiosCache.put(namespace, new HashSet<>());
             }
             savedAudiosCache.get(namespace).add(audio);
-            if(!savedAudios.containsKey(namespace)) {
-                savedAudios.put(namespace, new HashSet<>());
-            }
         }
         if(!audioSavingTaskScheduled){
             audioSavingTaskScheduled = true;
-            VoiceChatRecording.LOGGER.info("Audios will be saved in 5 minutes");
-            audioSavingTask.schedule(this::saveAudios, RecordingCommonConfig.AUDIO_SAVING_COOLDOWN.get());
+            int cd = RecordingCommonConfig.AUDIO_SAVING_COOLDOWN.get();
+            VoiceChatRecording.LOGGER.info("Audios will be saved in {} seconds...", cd/20);
+            audioSavingTask.schedule(this::saveAudios, cd);
         }
     }
 
     public void unsaveAudio(String namespace, RecordedAudio audio) {
+        // TODO if this is called before the audio gets written to disk, since it is still in savedAudiosCache it will still be written to disk, although it'll be deleted right afterwards if no other namespace saves it
+        //  We can't just remove it from there since it's possible some other namespace also saved it, so is it worth it dealing with this edge case?
         if(savedAudios.containsKey(namespace)) {
             savedAudios.get(namespace).remove(new Pair<>(audio.getPlayerUUID(), audio.getId()));
         }
@@ -300,6 +320,11 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin, VoiceChatRecor
     }
 
     private RecordedAudio readAudioFromFile(Path audioPath, Consumer<RecordedAudio> reaction, Pair<UUID, UUID> ids, LoadType type) {
+        if(!Files.exists(audioPath)) {
+            VoiceChatRecording.LOGGER.error("Tried to load non-existent audio {}", audioPath);
+            reaction.accept(null);
+            return null;
+        }
         File audioFile = audioPath.toFile();
         try (DataInputStream dis = new DataInputStream(new FileInputStream(audioFile))) {
             short[] audio = new short[(int)(audioFile.length() / 2)];
@@ -323,12 +348,25 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin, VoiceChatRecor
     @Nullable
     private Future<RecordedAudio> loadRawAudio(Pair<UUID, UUID> ids, LoadType type, Consumer<RecordedAudio> reaction) {
         Path audioPath = RecordedAudio.audiosPath.resolve(RecordedAudio.getFileName(ids.getFirst(), ids.getSecond()));
-        if(!Files.exists(audioPath)) {
-            VoiceChatRecording.LOGGER.error("Tried to load non-existent audio {}", audioPath);
-            return null;
-        }
         // Check the cache immediately before filling it
         VoiceChatRecording.LOGGER.debug("Checking cache...");
+        // Check the savedAudiosCache, since if it's in there it most likely hasn't been written to disk
+        RecordedAudio id = RecordedAudio.makeIdentificationAudio(ids.getFirst(), ids.getSecond());
+        AtomicReference<RecordedAudio> found = new AtomicReference<>(null);
+        savedAudiosCache.values().forEach((set) -> {
+            // You can check if an element is in a set, but not retrieve it
+            if(set.contains(id)) {
+                for(RecordedAudio audio : set) {
+                    if(audio.equals(id)) {
+                        found.set(audio);
+                        return;
+                    }
+                }
+            }
+        });
+        if(found.get() != null) {
+            return audioLoader.submit(found::get);
+        }
         if(audioCache.isCached(ids)) {
             return audioCache.get(ids);
         }
