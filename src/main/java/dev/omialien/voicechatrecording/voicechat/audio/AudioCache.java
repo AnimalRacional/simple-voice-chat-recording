@@ -3,7 +3,7 @@ package dev.omialien.voicechatrecording.voicechat.audio;
 import com.mojang.datafixers.util.Pair;
 import dev.omialien.voicechatrecording.VoiceChatRecording;
 import dev.omialien.voicechatrecording.configs.RecordingCommonConfig;
-import dev.omialien.voicechatrecording.voicechat.RecordedAudio;
+import dev.omialien.voicechatrecording_api.IRecordedAudio;
 
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
@@ -15,10 +15,10 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Future;
 
 public class AudioCache {
-    class CacheEntry {
-        private Future<RecordedAudio> audio;
+    static class CacheEntry {
+        private final Future<IRecordedAudio> audio;
         private long addedTime;
-        public CacheEntry(Future<RecordedAudio> audio, long addedTime) {
+        public CacheEntry(Future<IRecordedAudio> audio, long addedTime) {
             this.audio = audio;
             this.addedTime = addedTime;
         }
@@ -27,7 +27,7 @@ public class AudioCache {
         }
 
         public long getTime() { return this.addedTime; }
-        public Future<RecordedAudio> getAudio() { return this.audio; }
+        public Future<IRecordedAudio> getAudio() { return this.audio; }
     }
     // This should be fine to not reset between worlds, as even in different worlds
     // there shouldn't be 2 audios with the same UUIDs and this is only used to
@@ -70,7 +70,7 @@ public class AudioCache {
         removalThread.start();
     }
 
-    public Future<RecordedAudio> get(Pair<UUID, UUID> ids) {
+    public Future<IRecordedAudio> get(Pair<UUID, UUID> ids) {
         if(audioLoadingCache.containsKey(ids)) {
             CacheEntry entry = audioLoadingCache.get(ids);
             entry.refresh();
@@ -81,7 +81,7 @@ public class AudioCache {
 
     public boolean isCached(Pair<UUID, UUID> ids) { return audioLoadingCache.containsKey(ids); }
 
-    public void add(Pair<UUID, UUID> ids, Future<RecordedAudio> audio) {
+    public void add(Pair<UUID, UUID> ids, Future<IRecordedAudio> audio) {
         if(audioLoadingCache.containsKey(ids)) {
             // Refresh the audio time because it's still in use
             audioLoadingCache.get(ids).refresh();

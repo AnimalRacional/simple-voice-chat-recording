@@ -10,6 +10,7 @@ import dev.omialien.voicechatrecording.VoiceChatRecording;
 import dev.omialien.voicechatrecording.configs.RecordingCommonConfig;
 import dev.omialien.voicechatrecording.taskscheduler.TaskScheduler;
 import dev.omialien.voicechatrecording.voicechat.audio.AudioCache;
+import dev.omialien.voicechatrecording_api.IRecordedAudio;
 import dev.omialien.voicechatrecording_api.IRecordedPlayer;
 import dev.omialien.voicechatrecording_api.VoiceChatRecordingApi;
 import dev.omialien.voicechatrecording_api.events.AudioLoadedEvent;
@@ -35,8 +36,8 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin, VoiceChatRecor
     private Map<UUID, RecordedPlayer> recordedPlayers;
     private Map<UUID, Boolean> privacyMode;
     private ExecutorService audioLoader;
-    private Map<String, Set<Pair<UUID, UUID>>> savedAudios;
-    private Map<String, Set<RecordedAudio>> audiosToWriteToDisk;
+    public Map<String, Set<Pair<UUID, UUID>>> savedAudios;
+    public Map<String, Set<RecordedAudio>> audiosToWriteToDisk;
     // TODO is this queue really needed? check if the concurrenthashmap can handle both the saving thread removing audios, and mods adding new audios
     private Queue<Pair<String, RecordedAudio>> audiosToSave;
     public TaskScheduler audioSavingTask;
@@ -316,7 +317,7 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin, VoiceChatRecor
         NAMESPACE
     }
 
-    private RecordedAudio readAudioFromFile(Path audioPath, Consumer<RecordedAudio> reaction, Pair<UUID, UUID> ids) {
+    private IRecordedAudio readAudioFromFile(Path audioPath, Consumer<IRecordedAudio> reaction, Pair<UUID, UUID> ids) {
         if(!Files.exists(audioPath)) {
             VoiceChatRecording.LOGGER.error("Tried to load non-existent audio {}", audioPath);
             reaction.accept(null);
@@ -342,9 +343,8 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin, VoiceChatRecor
     }
 
     @Nullable
-    private Future<RecordedAudio> loadRawAudio(Pair<UUID, UUID> ids, LoadType type, Consumer<RecordedAudio> reaction, String namespace) {
+    private Future<IRecordedAudio> loadRawAudio(Pair<UUID, UUID> ids, LoadType type, Consumer<IRecordedAudio> reaction, String namespace) {
         Path audioPath = RecordedAudio.audiosPath.resolve(RecordedAudio.getFileName(ids.getFirst(), ids.getSecond()));
-        // Check the cache immediately before filling it
         VoiceChatRecording.LOGGER.debug("Checking cache...");
         // Check the savedAudiosCache, since if it's in there it most likely hasn't been written to disk
         RecordedAudio id = RecordedAudio.makeIdentificationAudio(ids.getFirst(), ids.getSecond());
@@ -364,7 +364,7 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin, VoiceChatRecor
             return audioLoader.submit(found::get);
         }
         if(audioCache.isCached(ids)) {
-            Future<RecordedAudio> cached = audioCache.get(ids);
+            Future<IRecordedAudio> cached = audioCache.get(ids);
             if(cached.state() == Future.State.SUCCESS){
                 try{
                     NeoForge.EVENT_BUS.post(new AudioLoadedEvent(cached.get(), type, namespace));
@@ -375,24 +375,25 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin, VoiceChatRecor
             }
             return cached;
         }
+        VoiceChatRecording.LOGGER.debug("Not in cache, adding");
         audioCache.add(ids, audioLoader.submit(() -> {
-            RecordedAudio res = this.readAudioFromFile(audioPath, reaction, ids);
+            IRecordedAudio res = this.readAudioFromFile(audioPath, reaction, ids);
             NeoForge.EVENT_BUS.post(new AudioLoadedEvent(res, type, namespace));
             return res;
         }));
-        VoiceChatRecording.LOGGER.debug("Not in cache, added");
+        VoiceChatRecording.LOGGER.debug("Added");
         return audioCache.get(ids);
     }
 
-    private Future<RecordedAudio> loadRawAudio(Pair<UUID, UUID> ids, LoadType type, Consumer<RecordedAudio> reaction){
+    private Future<IRecordedAudio> loadRawAudio(Pair<UUID, UUID> ids, LoadType type, Consumer<IRecordedAudio> reaction){
         return loadRawAudio(ids, type, reaction, "");
     }
 
-    private Future<RecordedAudio> loadRawAudio(Pair<UUID, UUID> ids, LoadType type, String namespace){
+    private Future<IRecordedAudio> loadRawAudio(Pair<UUID, UUID> ids, LoadType type, String namespace){
         return loadRawAudio(ids, type, (audio) -> {}, namespace);
     }
 
-    private Future<RecordedAudio> loadRawAudio(Pair<UUID, UUID> ids, LoadType type) {
+    private Future<IRecordedAudio> loadRawAudio(Pair<UUID, UUID> ids, LoadType type) {
         return loadRawAudio(ids, type, "");
     }
 
@@ -400,17 +401,17 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin, VoiceChatRecor
     /**
      * Loads all audios of the given namespace from disk, passing them to {@param reaction}
      * @param namespace the namespace to identify audios to load
-     * @param reaction a consumer to react to the loaded {@link RecordedAudio}; if an error occurs, the audio will be null
+     * @param reaction a consumer to react to the loaded {@link IRecordedAudio}; if an error occurs, the audio will be null
      * @return a list of futures of the loaded audios
      */
     @Override
-    public List<Future<RecordedAudio>> loadNamespaceAudios(String namespace, Consumer<RecordedAudio> reaction) {
+    public List<Future<IRecordedAudio>> loadNamespaceAudios(String namespace, Consumer<IRecordedAudio> reaction) {
         if(!savedAudios.containsKey(namespace)) {
             VoiceChatRecording.LOGGER.warn("Tried to load from non-existent namespace {}", namespace);
             return Collections.emptyList();
         }
         Set<Pair<UUID, UUID>> toLoad = savedAudios.get(namespace);
-        List<Future<RecordedAudio>> loadedAudios = new ArrayList<>(toLoad.size());
+        List<Future<IRecordedAudio>> loadedAudios = new ArrayList<>(toLoad.size());
         for(Pair<UUID, UUID> cur : toLoad) {
             loadedAudios.add(loadRawAudio(cur, LoadType.NAMESPACE, reaction, namespace));
         }
@@ -424,7 +425,7 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin, VoiceChatRecor
      * Also see {@link VoiceChatRecordingPlugin#loadNamespaceAudios(String, Consumer)}
      */
     @Override
-    public List<Future<RecordedAudio>> loadNamespaceAudios(String namespace) {
+    public List<Future<IRecordedAudio>> loadNamespaceAudios(String namespace) {
         return loadNamespaceAudios(namespace, (audio) -> {});
     }
 
@@ -448,7 +449,7 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin, VoiceChatRecor
      * @return a future which will return the loaded audio or null if an error occurs
      */
     @Override
-    public Future<RecordedAudio> loadAudio(UUID playerUuid, UUID audioId, Consumer<RecordedAudio> reaction) {
+    public Future<IRecordedAudio> loadAudio(UUID playerUuid, UUID audioId, Consumer<IRecordedAudio> reaction) {
         return loadRawAudio(new Pair<>(playerUuid, audioId), LoadType.SINGLE, reaction);
     }
 
@@ -459,7 +460,7 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin, VoiceChatRecor
      * @return a future which will return the loaded audio or null if an error occurs
      */
     @Override
-    public Future<RecordedAudio> loadAudio(UUID playerUuid, UUID audioId){
+    public Future<IRecordedAudio> loadAudio(UUID playerUuid, UUID audioId){
         return loadAudio(playerUuid, audioId, (audio) -> {});
     }
 
@@ -470,9 +471,9 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin, VoiceChatRecor
      * @return a list of futures which will return either the loaded audios or null if an error occurred
      */
     @Override
-    public List<Future<RecordedAudio>> loadPlayerAudios(UUID playerUuid, Consumer<RecordedAudio> reaction) {
+    public List<Future<IRecordedAudio>> loadPlayerAudios(UUID playerUuid, Consumer<IRecordedAudio> reaction) {
         // Assume 50 audios per namespace for pre-allocating memory
-        List<Future<RecordedAudio>> loadedAudios = new ArrayList<>(savedAudios.keySet().size() * 50);
+        List<Future<IRecordedAudio>> loadedAudios = new ArrayList<>(savedAudios.size() * 50);
         for(Set<Pair<UUID, UUID>> audios : savedAudios.values()) {
             for(Pair<UUID, UUID> audio : audios) {
                 if(audio.getFirst().equals(playerUuid)) {
@@ -489,7 +490,7 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin, VoiceChatRecor
      * @return a list of futures which will return either the player's audio or null if an error occured
      */
     @Override
-    public List<Future<RecordedAudio>> loadPlayerAudios(UUID playerUuid){
+    public List<Future<IRecordedAudio>> loadPlayerAudios(UUID playerUuid){
         return loadPlayerAudios(playerUuid, (audio) -> {});
     }
 

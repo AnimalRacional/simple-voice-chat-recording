@@ -1,7 +1,6 @@
 package dev.omialien.voicechatrecording_api;
 
 import com.mojang.datafixers.util.Pair;
-import dev.omialien.voicechatrecording.voicechat.RecordedAudio;
 
 import java.util.List;
 import java.util.Set;
@@ -10,13 +9,13 @@ import java.util.concurrent.Future;
 import java.util.function.Consumer;
 
 public interface VoiceChatRecordingApi {
-    List<Future<RecordedAudio>> loadNamespaceAudios(String namespace, Consumer<RecordedAudio> reaction);
-    List<Future<RecordedAudio>> loadNamespaceAudios(String namespace);
+    List<Future<IRecordedAudio>> loadNamespaceAudios(String namespace, Consumer<IRecordedAudio> reaction);
+    List<Future<IRecordedAudio>> loadNamespaceAudios(String namespace);
     Set<Pair<UUID, UUID>> getNamespaceAudios(String namespace);
-    Future<RecordedAudio> loadAudio(UUID playerUuid, UUID audioId, Consumer<RecordedAudio> reaction);
-    Future<RecordedAudio> loadAudio(UUID playerUuid, UUID audioId);
-    List<Future<RecordedAudio>> loadPlayerAudios(UUID playerUuid, Consumer<RecordedAudio> reaction);
-    List<Future<RecordedAudio>> loadPlayerAudios(UUID playerUuid);
+    Future<IRecordedAudio> loadAudio(UUID playerUuid, UUID audioId, Consumer<IRecordedAudio> reaction);
+    Future<IRecordedAudio> loadAudio(UUID playerUuid, UUID audioId);
+    List<Future<IRecordedAudio>> loadPlayerAudios(UUID playerUuid, Consumer<IRecordedAudio> reaction);
+    List<Future<IRecordedAudio>> loadPlayerAudios(UUID playerUuid);
     IRecordedPlayer getRecordedPlayer(UUID uuid);
     boolean getPrivacy(UUID uuid);
 
