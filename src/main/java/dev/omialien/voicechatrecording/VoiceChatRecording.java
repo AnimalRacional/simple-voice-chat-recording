@@ -28,7 +28,7 @@ public class VoiceChatRecording {
     public static final LevelResource AUDIO_DIRECTORY = new LevelResource("player_audios");
     // Directly reference a slf4j logger
     public static final Logger LOGGER = LogUtils.getLogger();
-    public static final List<IRecordedAudio> storedAudios = new ArrayList<>();
+    public static List<IRecordedAudio> storedAudios = new ArrayList<>();
     public static VoiceChatRecordingApi recordingApi;
 
     // The constructor for the mod class is the first code that is run when your mod is loaded.

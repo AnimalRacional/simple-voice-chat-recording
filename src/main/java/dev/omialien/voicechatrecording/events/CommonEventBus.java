@@ -10,7 +10,6 @@ import dev.omialien.voicechatrecording.voicechat.RecordedAudio;
 import dev.omialien.voicechatrecording.voicechat.VoiceChatRecordingPlugin;
 import dev.omialien.voicechatrecording_api.events.AudioEvent;
 import dev.omialien.voicechatrecording_api.events.AudioLoadedEvent;
-import dev.omialien.voicechatrecording_api.events.AudioRecordedEvent;
 import dev.omialien.voicechatrecording_api.events.RecordingSetupEvent;
 import net.neoforged.bus.api.EventPriority;
 import net.neoforged.bus.api.SubscribeEvent;
@@ -24,11 +23,13 @@ import net.neoforged.neoforge.network.registration.PayloadRegistrar;
 
 import java.io.IOException;
 import java.nio.file.Files;
+import java.util.ArrayList;
 
 @EventBusSubscriber(modid = VoiceChatRecording.MOD_ID)
 public class CommonEventBus {
     @SubscribeEvent
     public static void onServerStarting(ServerStartingEvent event) {
+        VoiceChatRecording.storedAudios = new ArrayList<>();
         VoiceChatRecording.LOGGER.debug("Server starting");
         RecordedAudio.audiosPath = event.getServer().getWorldPath(VoiceChatRecording.AUDIO_DIRECTORY);
         if(!Files.exists(RecordedAudio.audiosPath)){
@@ -65,6 +66,7 @@ public class CommonEventBus {
         ListAudiosCommand.register(event.getDispatcher());
         SaveAudioCommand.register(event.getDispatcher());
         AudioInfoCommand.register(event.getDispatcher());
+        LoadAudioCommand.register(event.getDispatcher());
     }
 
     @SubscribeEvent
@@ -87,27 +89,16 @@ public class CommonEventBus {
     }
 
     @SubscribeEvent
-    public static void onRecordedAudio(AudioRecordedEvent event){
-        IRecordedAudio audio = event.getAudio();
-
-        if(RememberAudiosCommand.shouldRemember && audio.getFilterResult() == RecordedAudio.FilterResult.PASSED){
-            VoiceChatRecording.LOGGER.debug("EVENT: Audio recorded! Filter result: {}", audio.getFilterResult());
-            VoiceChatRecording.storedAudios.add(audio);
-        }
-    }
-
-    @SubscribeEvent
     public static void onLoadedAudio(AudioLoadedEvent event){
         VoiceChatRecording.LOGGER.debug("EVENT: Audio loaded! {} {} {}", event.getAudio().getFilterResult(), event.getAudio().getPlayerUUID(), event.getAudio().getId());
-        // TODO add loadAudio command and after that check VoiceChatRecording.rememberAudios before adding
-        if(event.getAudio().getFilterResult() == RecordedAudio.FilterResult.PASSED){
-            VoiceChatRecording.LOGGER.debug("EVENT: saving loaded audio! Filter result: {}", event.getAudio().getFilterResult());
-            VoiceChatRecording.storedAudios.add(event.getAudio());
-        }
     }
 
     @SubscribeEvent
     public static void onGenericAudio(AudioEvent event){
-        VoiceChatRecording.LOGGER.debug("GENERIC EVENT: audio happened {} {}", event.getAudio().getPlayerUUID(), event.getAudio().getId());
+        VoiceChatRecording.LOGGER.debug("GENERIC EVENT: audio {} {} {}", event.getAudio().getFilterResult().toString(), event.getAudio().getPlayerUUID(), event.getAudio().getId());
+        if(event.getAudio().getFilterResult() == IRecordedAudio.FilterResult.PASSED && RememberAudiosCommand.shouldRemember) {
+            VoiceChatRecording.LOGGER.debug("remembering");
+            VoiceChatRecording.storedAudios.add(event.getAudio());
+        }
     }
 }

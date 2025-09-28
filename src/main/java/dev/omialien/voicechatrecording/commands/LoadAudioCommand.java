@@ -10,14 +10,14 @@ import net.minecraft.network.chat.Component;
 
 import java.util.UUID;
 
-public class AudioInfoCommand {
+public class LoadAudioCommand {
     public static final int PERMISSION_LEVEL = 2;
 
     public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
-        dispatcher.register(Commands.literal("audioInfo").
+        dispatcher.register(Commands.literal("loadAudio").
                 requires((src) -> src.hasPermission(PERMISSION_LEVEL))
                 .then(CommandUtil.PLAYER_ARGUMENT
-                        .then(CommandUtil.AUDIO_ARGUMENT.executes(AudioInfoCommand::executeCommand))));
+                        .then(CommandUtil.AUDIO_ARGUMENT.executes(LoadAudioCommand::executeCommand))));
     }
 
     private static int executeCommand(CommandContext<CommandSourceStack> src) {
@@ -25,6 +25,7 @@ public class AudioInfoCommand {
         UUID id = UuidArgument.getUuid(src, "audio");
         RecordedAudio res = CommandUtil.loadAudio(player, id, src);
         if (res != null) {
+            src.getSource().sendSuccess(() -> Component.literal("Loading audio with " + res.getDuration() + " seconds"), true);
             String info = res.getAudioInfo();
             src.getSource().sendSuccess(() -> Component.literal(info), false);
         } else {

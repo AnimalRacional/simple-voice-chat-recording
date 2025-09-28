@@ -29,7 +29,6 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
-// TODO check if leaving and rejoining world or servers messes up things since they stopped being static
 @ForgeVoicechatPlugin
 public class VoiceChatRecordingPlugin implements VoicechatPlugin, VoiceChatRecordingApi {
     private static final Gson gson = new Gson();
@@ -178,21 +177,21 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin, VoiceChatRecor
     @Override
     public void initialize(VoicechatApi api) {
         VoiceChatRecording.recordingApi = this;
+    }
+
+    private void onServerStarted(VoicechatServerStartedEvent event) {
+        VoiceChatRecording.LOGGER.debug("Initializing Recording API");
+        VoicechatServerApi api = event.getVoicechat();
+        VoiceChatRecording.vcApi = api;
+        VoiceChatRecording.recordingApi = this;
         if(audioCache != null) audioCache.interruptThread();
         audioCache = new AudioCache();
-        if(api instanceof VoicechatServerApi napi){
-            VoiceChatRecording.LOGGER.info("Server Voice Chat API");
-            VoiceChatRecording.vcApi = napi;
-        } else {
-            VoiceChatRecording.LOGGER.info("Client Voice Chat API");
-        }
         audiosToWriteToDisk = new ConcurrentHashMap<>();
         savedAudios = new ConcurrentHashMap<>();
         audiosToSave = new ConcurrentLinkedQueue<>();
         audioSavingTask = new TaskScheduler();
         audioSavingTaskScheduled = false;
         audioLoader = Executors.newFixedThreadPool(RecordingCommonConfig.AUDIO_READER_THREAD_COUNT.get());
-        createAudioSavingThread();
         if(audioSavingThread != null && audioSavingThread.isAlive()){
             try {
                 VoiceChatRecording.LOGGER.debug("joining saving thread");
@@ -202,11 +201,7 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin, VoiceChatRecor
                 throw new RuntimeException(e);
             }
         }
-        VoiceChatRecording.LOGGER.info("Voice chat recording plugin initialized!");
-    }
-
-    private void onServerStarted(VoicechatServerStartedEvent event) {
-        VoicechatServerApi api = event.getVoicechat();
+        createAudioSavingThread();
 
         try {
             loadNamespaceFiles();
@@ -402,16 +397,16 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin, VoiceChatRecor
      * Loads all audios of the given namespace from disk, passing them to {@param reaction}
      * @param namespace the namespace to identify audios to load
      * @param reaction a consumer to react to the loaded {@link IRecordedAudio}; if an error occurs, the audio will be null
-     * @return a list of futures of the loaded audios
+     * @return a set of futures of the loaded audios
      */
     @Override
-    public List<Future<IRecordedAudio>> loadNamespaceAudios(String namespace, Consumer<IRecordedAudio> reaction) {
+    public Set<Future<IRecordedAudio>> loadNamespaceAudios(String namespace, Consumer<IRecordedAudio> reaction) {
         if(!savedAudios.containsKey(namespace)) {
             VoiceChatRecording.LOGGER.warn("Tried to load from non-existent namespace {}", namespace);
-            return Collections.emptyList();
+            return Collections.emptySet();
         }
         Set<Pair<UUID, UUID>> toLoad = savedAudios.get(namespace);
-        List<Future<IRecordedAudio>> loadedAudios = new ArrayList<>(toLoad.size());
+        Set<Future<IRecordedAudio>> loadedAudios = new HashSet<>(toLoad.size());
         for(Pair<UUID, UUID> cur : toLoad) {
             loadedAudios.add(loadRawAudio(cur, LoadType.NAMESPACE, reaction, namespace));
         }
@@ -421,11 +416,11 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin, VoiceChatRecor
     /**
      * Loads all audios of the given namespace from disk
      * @param namespace the namespace to identify audios to load
-     * @return a list of futures of the loaded audios. If an error occurs, the audio will be null
+     * @return a set of futures of the loaded audios. If an error occurs, the audio will be null
      * Also see {@link VoiceChatRecordingPlugin#loadNamespaceAudios(String, Consumer)}
      */
     @Override
-    public List<Future<IRecordedAudio>> loadNamespaceAudios(String namespace) {
+    public Set<Future<IRecordedAudio>> loadNamespaceAudios(String namespace) {
         return loadNamespaceAudios(namespace, (audio) -> {});
     }
 
@@ -468,29 +463,25 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin, VoiceChatRecor
      * Loads all available audios of a given player and passes them to the given consumer
      * @param playerUuid The UUID of the player to load audios of
      * @param reaction The reaction to pass the audio to
-     * @return a list of futures which will return either the loaded audios or null if an error occurred
+     * @return a set of futures which will return either the loaded audios or null if an error occurred
      */
     @Override
-    public List<Future<IRecordedAudio>> loadPlayerAudios(UUID playerUuid, Consumer<IRecordedAudio> reaction) {
-        // Assume 50 audios per namespace for pre-allocating memory
-        List<Future<IRecordedAudio>> loadedAudios = new ArrayList<>(savedAudios.size() * 50);
-        for(Set<Pair<UUID, UUID>> audios : savedAudios.values()) {
-            for(Pair<UUID, UUID> audio : audios) {
-                if(audio.getFirst().equals(playerUuid)) {
-                    loadedAudios.add(loadRawAudio(audio, LoadType.ALL_FROM_USER, reaction));
-                }
-            }
-        }
+    public Set<Future<IRecordedAudio>> loadPlayerAudios(UUID playerUuid, Consumer<IRecordedAudio> reaction) {
+        // Assume 10 audios per namespace per player for pre-allocating memory
+        Set<Future<IRecordedAudio>> loadedAudios = new HashSet<>(savedAudios.size() * 50);
+        savedAudios.values().stream().flatMap(Set::stream).forEach((audio) ->
+                loadedAudios.add(loadRawAudio(audio, LoadType.ALL_FROM_USER, reaction))
+        );
         return loadedAudios;
     }
 
     /**
      * Loads all available audios of a given player
      * @param playerUuid the UUID of the player to get audios of
-     * @return a list of futures which will return either the player's audio or null if an error occured
+     * @return a set of futures which will return either the player's audio or null if an error occured
      */
     @Override
-    public List<Future<IRecordedAudio>> loadPlayerAudios(UUID playerUuid){
+    public Set<Future<IRecordedAudio>> loadPlayerAudios(UUID playerUuid){
         return loadPlayerAudios(playerUuid, (audio) -> {});
     }
 
@@ -499,8 +490,6 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin, VoiceChatRecor
         RecordedPlayer player = new RecordedPlayer(playerUuid);
         recordedPlayers.put(playerUuid, player);
         startRecording(playerUuid);
-        // TODO remove this, it's for debug
-        loadPlayerAudios(e.getConnection().getPlayer().getUuid(), (audio) -> VoiceChatRecording.LOGGER.debug("REACTION:{} {}", audio.getId(), audio.getDuration()));
     }
 
     private void onPlayerDisconnected(PlayerDisconnectedEvent e){
@@ -514,13 +503,13 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin, VoiceChatRecor
 
     public void stopRecording(UUID uuid) {
         recordedPlayers.get(uuid).saveCurrentRecording();
-        VoiceChatRecording.LOGGER.debug("Stopped recording for player: " + uuid.toString());
+        VoiceChatRecording.LOGGER.debug("Stopped recording for player: {}", uuid.toString());
 
     }
 
     public void startRecording(UUID uuid) {
         recordedPlayers.get(uuid).startRecording();
-        VoiceChatRecording.LOGGER.debug("Recording started for player: " + uuid.toString());
+        VoiceChatRecording.LOGGER.debug("Recording started for player: {}", uuid.toString());
     }
 
     @Override

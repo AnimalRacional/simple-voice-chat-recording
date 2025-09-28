@@ -53,7 +53,8 @@ public class NearestEntityPlayVoiceCommand {
                 Commands.argument("lfo-frequency", FloatArgumentType.floatArg()).executes(cmd)
         );
     }
-    // TODO adicionar argumento de localização em vez de entidade
+    // TODO make this use savedAudios like the other commands
+    // TODO add argument to use location instead of entity
     public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
         dispatcher.register(
                 Commands.literal("playVoice").requires((src) -> src.hasPermission(PERMISSION_LEVEL))
