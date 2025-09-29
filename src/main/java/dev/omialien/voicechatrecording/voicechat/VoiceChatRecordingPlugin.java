@@ -166,6 +166,7 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin, VoiceChatRecor
             audioSavingThread.start();
         }
         // Thread is running, wait for it to finish
+        VoiceChatRecording.LOGGER.info("Running audio saving thread before shutdown...");
         audioSavingThread.join();
     }
 

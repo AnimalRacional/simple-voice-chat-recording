@@ -46,6 +46,7 @@ public class CommonEventBus {
         event.addCategory(VoiceChatRecording.CATEGORY_ID, "Recording Plugin", "The volume of recorded voices", null);
     }
 
+    // FIXME when leaving a single player game, there's a delay in saving the world, even if no audios get saved
     @SubscribeEvent(priority = EventPriority.LOWEST)
     public static void onServerClosed(ServerStoppedEvent event){
         try{
