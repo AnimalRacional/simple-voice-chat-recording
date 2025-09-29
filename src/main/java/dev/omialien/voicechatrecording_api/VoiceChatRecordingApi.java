@@ -13,9 +13,11 @@ public interface VoiceChatRecordingApi {
     Set<Pair<UUID, UUID>> getNamespaceAudios(String namespace);
     Future<IRecordedAudio> loadAudio(UUID playerUuid, UUID audioId, Consumer<IRecordedAudio> reaction);
     Future<IRecordedAudio> loadAudio(UUID playerUuid, UUID audioId);
+    // TODO add loadPlayerAudios with a namespace argument
     Set<Future<IRecordedAudio>> loadPlayerAudios(UUID playerUuid, Consumer<IRecordedAudio> reaction);
     Set<Future<IRecordedAudio>> loadPlayerAudios(UUID playerUuid);
     IRecordedPlayer getRecordedPlayer(UUID uuid);
     boolean getPrivacy(UUID uuid);
+    void unsaveAudio(String namespace, IRecordedAudio audio);
 
 }

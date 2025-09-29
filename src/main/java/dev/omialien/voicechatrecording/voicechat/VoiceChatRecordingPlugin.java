@@ -256,7 +256,8 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin, VoiceChatRecor
         }
     }
 
-    public void unsaveAudio(String namespace, RecordedAudio audio) {
+    @Override
+    public void unsaveAudio(String namespace, IRecordedAudio audio) {
         // TODO if this is called before the audio gets written to disk, since it is still in audiosToWriteToDisk it will still be written to disk, although it'll be deleted right afterwards if no other namespace saves it
         //  We can't just remove it from there since it's possible some other namespace also saved it, so is it worth it dealing with this edge case?
         if(savedAudios.containsKey(namespace)) {
