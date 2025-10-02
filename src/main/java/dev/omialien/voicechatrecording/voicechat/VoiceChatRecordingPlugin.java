@@ -170,6 +170,11 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin, VoiceChatRecor
         audioSavingThread.join();
     }
 
+    public void shutdownAudioLoading() {
+        audioLoader.shutdownNow();
+        audioCache.interruptThread();
+    }
+
     /**
      * Called when the voice chat initializes the plugin.
      *

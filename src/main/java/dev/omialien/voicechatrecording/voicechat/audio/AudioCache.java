@@ -40,7 +40,12 @@ public class AudioCache {
     }
 
     public void interruptThread() {
-        this.removalThread.interrupt();
+        if(this.removalThread.isAlive()) {
+            this.removalThread.interrupt();
+        } else {
+            VoiceChatRecording.LOGGER.error("Tried to interrupt cache removal thread while alive!");
+            VoiceChatRecording.LOGGER.error("interruption stacktrace: {}", (Object[]) Thread.currentThread().getStackTrace());
+        }
     }
 
     private void restartThread() {
@@ -63,7 +68,8 @@ public class AudioCache {
                 try {
                     Thread.sleep(Duration.of(RecordingCommonConfig.CACHE_CHECK_INTERVAL.get(), ChronoUnit.SECONDS));
                 } catch (InterruptedException e) {
-                    throw new RuntimeException(e);
+                    VoiceChatRecording.LOGGER.warn("Interrupted cache removal thread, finishing");
+                    return;
                 }
             }
         });

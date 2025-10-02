@@ -52,6 +52,7 @@ public class CommonEventBus {
         try{
             VoiceChatRecording.LOGGER.info("Shutting down audio saving...");
             ((VoiceChatRecordingPlugin)VoiceChatRecording.recordingApi).shutdownSaving();
+            ((VoiceChatRecordingPlugin)VoiceChatRecording.recordingApi).shutdownAudioLoading();
         } catch(InterruptedException e){
             VoiceChatRecording.LOGGER.error("Audio saving shutdown interrupted! {}\n{}", e.getMessage(), e.getStackTrace());
         }
