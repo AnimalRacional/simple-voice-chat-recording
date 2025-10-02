@@ -313,12 +313,6 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin, VoiceChatRecor
         }
     }
 
-    public enum LoadType {
-        SINGLE,
-        ALL_FROM_USER,
-        NAMESPACE
-    }
-
     private IRecordedAudio readAudioFromFile(Path audioPath, Consumer<IRecordedAudio> reaction, Pair<UUID, UUID> ids) {
         if(!Files.exists(audioPath)) {
             VoiceChatRecording.LOGGER.error("Tried to load non-existent audio {}", audioPath);
@@ -345,7 +339,7 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin, VoiceChatRecor
     }
 
     @Nullable
-    private Future<IRecordedAudio> loadRawAudio(Pair<UUID, UUID> ids, LoadType type, Consumer<IRecordedAudio> reaction, String namespace) {
+    private Future<IRecordedAudio> loadRawAudio(Pair<UUID, UUID> ids, AudioLoadedEvent.LoadType type, Consumer<IRecordedAudio> reaction, String namespace) {
         Path audioPath = RecordedAudio.audiosPath.resolve(RecordedAudio.getFileName(ids.getFirst(), ids.getSecond()));
         VoiceChatRecording.LOGGER.debug("Checking cache...");
         // Check the savedAudiosCache, since if it's in there it most likely hasn't been written to disk
@@ -387,15 +381,15 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin, VoiceChatRecor
         return audioCache.get(ids);
     }
 
-    private Future<IRecordedAudio> loadRawAudio(Pair<UUID, UUID> ids, LoadType type, Consumer<IRecordedAudio> reaction){
+    private Future<IRecordedAudio> loadRawAudio(Pair<UUID, UUID> ids, AudioLoadedEvent.LoadType type, Consumer<IRecordedAudio> reaction){
         return loadRawAudio(ids, type, reaction, "");
     }
 
-    private Future<IRecordedAudio> loadRawAudio(Pair<UUID, UUID> ids, LoadType type, String namespace){
+    private Future<IRecordedAudio> loadRawAudio(Pair<UUID, UUID> ids, AudioLoadedEvent.LoadType type, String namespace){
         return loadRawAudio(ids, type, (audio) -> {}, namespace);
     }
 
-    private Future<IRecordedAudio> loadRawAudio(Pair<UUID, UUID> ids, LoadType type) {
+    private Future<IRecordedAudio> loadRawAudio(Pair<UUID, UUID> ids, AudioLoadedEvent.LoadType type) {
         return loadRawAudio(ids, type, "");
     }
 
@@ -415,7 +409,7 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin, VoiceChatRecor
         Set<Pair<UUID, UUID>> toLoad = savedAudios.get(namespace);
         Set<Future<IRecordedAudio>> loadedAudios = new HashSet<>(toLoad.size());
         for(Pair<UUID, UUID> cur : toLoad) {
-            loadedAudios.add(loadRawAudio(cur, LoadType.NAMESPACE, reaction, namespace));
+            loadedAudios.add(loadRawAudio(cur, AudioLoadedEvent.LoadType.NAMESPACE, reaction, namespace));
         }
         return loadedAudios;
     }
@@ -452,7 +446,7 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin, VoiceChatRecor
      */
     @Override
     public Future<IRecordedAudio> loadAudio(UUID playerUuid, UUID audioId, Consumer<IRecordedAudio> reaction) {
-        return loadRawAudio(new Pair<>(playerUuid, audioId), LoadType.SINGLE, reaction);
+        return loadRawAudio(new Pair<>(playerUuid, audioId), AudioLoadedEvent.LoadType.SINGLE, reaction);
     }
 
     /**
@@ -477,7 +471,7 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin, VoiceChatRecor
         // Assume 10 audios per namespace per player for pre-allocating memory
         Set<Future<IRecordedAudio>> loadedAudios = new HashSet<>(savedAudios.size() * 50);
         savedAudios.values().stream().flatMap(Set::stream).forEach((audio) ->
-                loadedAudios.add(loadRawAudio(audio, LoadType.ALL_FROM_USER, reaction))
+                loadedAudios.add(loadRawAudio(audio, AudioLoadedEvent.LoadType.ALL_FROM_USER, reaction))
         );
         return loadedAudios;
     }
@@ -521,7 +515,7 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin, VoiceChatRecor
 
     @Override
     public IRecordedPlayer getRecordedPlayer(UUID uuid) {
-        return recordedPlayers.get(uuid);
+        return recordedPlayers.getOrDefault(uuid, null);
     }
 
     @Override

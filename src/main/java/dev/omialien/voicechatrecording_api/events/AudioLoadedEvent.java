@@ -2,25 +2,29 @@ package dev.omialien.voicechatrecording_api.events;
 
 import dev.omialien.voicechatrecording.VoiceChatRecording;
 import dev.omialien.voicechatrecording_api.IRecordedAudio;
-import dev.omialien.voicechatrecording.voicechat.VoiceChatRecordingPlugin;
 
 public class AudioLoadedEvent extends AudioEvent {
-    private final VoiceChatRecordingPlugin.LoadType reason;
+    public enum LoadType {
+        SINGLE,
+        ALL_FROM_USER,
+        NAMESPACE
+    }
+    private final LoadType reason;
     private final String namespace;
-    public AudioLoadedEvent(IRecordedAudio audio, VoiceChatRecordingPlugin.LoadType loadType, String namespace){
+    public AudioLoadedEvent(IRecordedAudio audio, AudioLoadedEvent.LoadType loadType, String namespace){
         super(audio);
         this.reason = loadType;
         this.namespace = namespace;
     }
 
-    public AudioLoadedEvent(IRecordedAudio audio, VoiceChatRecordingPlugin.LoadType loadType) {
+    public AudioLoadedEvent(IRecordedAudio audio, AudioLoadedEvent.LoadType loadType) {
         this(audio, loadType, "");
-        if(loadType == VoiceChatRecordingPlugin.LoadType.NAMESPACE) {
+        if(loadType == AudioLoadedEvent.LoadType.NAMESPACE) {
             VoiceChatRecording.LOGGER.error("Firing AudioLoadedEvent with type namespace without specifying namespace");
         }
     }
 
-    public VoiceChatRecordingPlugin.LoadType getLoadReason(){
+    public AudioLoadedEvent.LoadType getLoadReason(){
         return this.reason;
     }
 
