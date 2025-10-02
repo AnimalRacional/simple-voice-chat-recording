@@ -1,4 +1,4 @@
-package dev.omialien.voicechatrecording.voicechat.util;
+package dev.omialien.voicechatrecording_api.util;
 
 import de.maxhenkel.voicechat.api.VoicechatServerApi;
 import de.maxhenkel.voicechat.api.audiochannel.AudioChannel;
