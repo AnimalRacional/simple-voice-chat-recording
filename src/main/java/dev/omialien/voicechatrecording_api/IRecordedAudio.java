@@ -39,7 +39,7 @@ public interface IRecordedAudio {
      * Marks this audio as persistent through server shutdowns
      * @param namespace this should usually be your mod id
      */
-    void saveAudio(String namespace);
+    boolean saveAudio(String namespace);
     // TODO command for this
     /**
      * Marks this audio as no longer persistent through server shutdowns

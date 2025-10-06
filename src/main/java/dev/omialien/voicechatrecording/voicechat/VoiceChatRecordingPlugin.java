@@ -363,7 +363,9 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin, VoiceChatRecor
             Future<IRecordedAudio> cached = audioCache.get(ids);
             if(cached.state() == Future.State.SUCCESS){
                 try{
-                    NeoForge.EVENT_BUS.post(new AudioLoadedEvent(cached.get(), type, namespace));
+                    IRecordedAudio audio = cached.get();
+                    reaction.accept(audio);
+                    NeoForge.EVENT_BUS.post(new AudioLoadedEvent(audio, type, namespace));
                 } catch(Exception e) {
                     VoiceChatRecording.LOGGER.error("Error getting successfully finished audio from cache to event: {} {}", ids.getFirst(), ids.getSecond());
                     VoiceChatRecording.LOGGER.error("{}", e.getMessage());
@@ -523,6 +525,7 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin, VoiceChatRecor
         return privacyMode.getOrDefault(uuid, true);
     }
     public void setPrivacy(UUID uuid, boolean state){
+        VoiceChatRecording.LOGGER.debug("set privacy mode {} of {}", state, uuid);
         privacyMode.put(uuid, state);
     }
 
