@@ -98,9 +98,13 @@ public class CommonEventBus {
     @SubscribeEvent
     public static void onGenericAudio(AudioEvent event){
         VoiceChatRecording.LOGGER.debug("GENERIC EVENT: audio {} {} {}", event.getAudio().getFilterResult().toString(), event.getAudio().getPlayerUUID(), event.getAudio().getId());
-        if(event.getAudio().getFilterResult() == IRecordedAudio.FilterResult.PASSED && RememberAudiosCommand.shouldRemember) {
-            VoiceChatRecording.LOGGER.debug("remembering");
-            VoiceChatRecording.storedAudios.add(event.getAudio());
+        if(RememberAudiosCommand.shouldRemember) {
+            IRecordedAudio.FilterResult filter = event.getAudio().getFilterResult();
+            if((filter == IRecordedAudio.FilterResult.PASSED || filter == IRecordedAudio.FilterResult.TOO_LONG)) {
+                VoiceChatRecording.LOGGER.debug("remembering");
+                VoiceChatRecording.storedAudios.add(event.getAudio());
+            }
         }
+
     }
 }

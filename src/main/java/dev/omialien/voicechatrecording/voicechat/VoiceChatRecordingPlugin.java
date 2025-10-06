@@ -20,6 +20,9 @@ import net.neoforged.neoforge.common.NeoForge;
 
 import javax.annotation.Nullable;
 import java.io.*;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import java.nio.channels.FileChannel;
 import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -83,11 +86,16 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin, VoiceChatRecor
                             savePool.submit(() -> {
                                 VoiceChatRecording.LOGGER.debug("saving {}", audioPath);
                                 try {
-                                    DataOutputStream dos = new DataOutputStream(new FileOutputStream(audioPath.toFile()));
-                                    for(short cur : audio.getAudio()) {
-                                        dos.writeShort(cur);
+                                    try (FileOutputStream fos = new FileOutputStream(audioPath.toFile())) {
+                                        FileChannel out = fos.getChannel();
+                                        short[] audioData = audio.getAudio();
+                                        ByteBuffer buffer = ByteBuffer.allocate(audioData.length * 2);
+                                        buffer.order(ByteOrder.BIG_ENDIAN).asShortBuffer().put(audioData);
+                                        long written = 0;
+                                        while(written < audioData.length * 2L) {
+                                            written += out.write(buffer);
+                                        }
                                     }
-                                    dos.close();
                                     VoiceChatRecording.LOGGER.debug("Finished writing {} to file", audioPath);
                                 } catch (FileNotFoundException e) {
                                     VoiceChatRecording.LOGGER.error("Couldn't find newly created file? {}", audioPath);
@@ -239,6 +247,7 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin, VoiceChatRecor
     }
 
     public void saveAudio(String namespace, RecordedAudio audio){
+        VoiceChatRecording.LOGGER.debug("PLUGIN saving audio {} {}", namespace, audio.getId());
         if(!savedAudios.containsKey(namespace)) {
             savedAudios.put(namespace, new HashSet<>());
         }
@@ -314,28 +323,25 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin, VoiceChatRecor
     }
 
     private IRecordedAudio readAudioFromFile(Path audioPath, Consumer<IRecordedAudio> reaction, Pair<UUID, UUID> ids) {
-        if(!Files.exists(audioPath)) {
+        short[] audio;
+        try {
+            byte[] byts = Files.readAllBytes(audioPath);
+            short[] shrts = new short[byts.length / 2];
+            ByteBuffer.wrap(byts).order(ByteOrder.BIG_ENDIAN).asShortBuffer().get(shrts);
+            audio = shrts;
+        }  catch (FileNotFoundException e) {
             VoiceChatRecording.LOGGER.error("Tried to load non-existent audio {}", audioPath);
             reaction.accept(null);
             return null;
-        }
-        File audioFile = audioPath.toFile();
-        try (DataInputStream dis = new DataInputStream(new FileInputStream(audioFile))) {
-            short[] audio = new short[(int)(audioFile.length() / 2)];
-            for(int i = 0; i < audioFile.length() / 2; i++) {
-                audio[i] = dis.readShort();
-            }
-            RecordedAudio recordedAudio = new RecordedAudio(audio, ids.getFirst(), ids.getSecond());
-            reaction.accept(recordedAudio);
-            return recordedAudio;
-        } catch (FileNotFoundException e) {
-            throw new RuntimeException(e);
         } catch (IOException e) {
             VoiceChatRecording.LOGGER.error("Error loading audio: {}", audioPath);
             VoiceChatRecording.LOGGER.error("{}", e.getMessage());
             reaction.accept(null);
+            return null;
         }
-        return null;
+        IRecordedAudio audioObj = new RecordedAudio(audio, ids.getFirst(), ids.getSecond());
+        reaction.accept(audioObj);
+        return audioObj;
     }
 
     @Nullable
@@ -519,11 +525,13 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin, VoiceChatRecor
     public IRecordedPlayer getRecordedPlayer(UUID uuid) {
         return recordedPlayers.getOrDefault(uuid, null);
     }
-
+    // TODO offline players who haven't joined the game since the
+    //  last server restart will always have privacy mode on;
+    //  it's a weird edge case, but a mod unsaving and then saving an
+    //  audio of one of those players will lose that audio as privacy mode
+    //  will prevent it from being saved
     @Override
-    public boolean getPrivacy(UUID uuid){
-        return privacyMode.getOrDefault(uuid, true);
-    }
+    public boolean getPrivacy(UUID uuid){ return privacyMode.getOrDefault(uuid, true);}
     public void setPrivacy(UUID uuid, boolean state){
         VoiceChatRecording.LOGGER.debug("set privacy mode {} of {}", state, uuid);
         privacyMode.put(uuid, state);
