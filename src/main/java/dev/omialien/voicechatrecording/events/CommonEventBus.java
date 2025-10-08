@@ -51,6 +51,8 @@ public class CommonEventBus {
     public static void onServerClosed(ServerStoppedEvent event){
         try{
             VoiceChatRecording.LOGGER.info("Shutting down audio saving...");
+            RememberAudiosCommand.shouldRemember = false;
+            VoiceChatRecording.storedAudios.clear();
             ((VoiceChatRecordingPlugin)VoiceChatRecording.recordingApi).shutdownSaving();
             ((VoiceChatRecordingPlugin)VoiceChatRecording.recordingApi).shutdownAudioLoading();
         } catch(InterruptedException e){
