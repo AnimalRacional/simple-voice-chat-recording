@@ -4,7 +4,6 @@ import com.mojang.brigadier.builder.RequiredArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.datafixers.util.Pair;
 import dev.omialien.voicechatrecording.VoiceChatRecording;
-import dev.omialien.voicechatrecording.voicechat.RecordedAudio;
 import dev.omialien.voicechatrecording.voicechat.VoiceChatRecordingPlugin;
 import dev.omialien.voicechatrecording_api.IRecordedAudio;
 import net.minecraft.commands.CommandSourceStack;
@@ -16,6 +15,7 @@ import net.minecraft.network.chat.Component;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
+import java.util.function.Consumer;
 import java.util.stream.Stream;
 
 public class CommandUtil {
@@ -48,14 +48,14 @@ public class CommandUtil {
         src.sendFailure(Component.literal("There was an error during audio loading!"));
     }
 
-    public static RecordedAudio loadAudio(UUID player, UUID id, CommandContext<CommandSourceStack> src) {
+    public static void loadAudio(UUID player, UUID id, CommandContext<CommandSourceStack> src, Consumer<IRecordedAudio> reaction) {
         try {
-            return (RecordedAudio) VoiceChatRecording.recordingApi.loadAudio(player, id).get();
+            VoiceChatRecording.recordingApi.loadAudio(player, id, reaction).get();
         } catch (InterruptedException e) {
             CommandUtil.sendInterruptFailure(src.getSource());
         } catch (ExecutionException e) {
             CommandUtil.sendLoadFailure(src.getSource());
         }
-        return null;
     }
 }
+

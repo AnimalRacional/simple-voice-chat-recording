@@ -3,6 +3,7 @@ package dev.omialien.voicechatrecording.commands;
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.context.CommandContext;
 import dev.omialien.voicechatrecording.voicechat.RecordedAudio;
+import dev.omialien.voicechatrecording_api.IRecordedAudio;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.commands.arguments.UuidArgument;
@@ -23,14 +24,16 @@ public class LoadAudioCommand {
     private static int executeCommand(CommandContext<CommandSourceStack> src) {
         UUID player = UuidArgument.getUuid(src, "player");
         UUID id = UuidArgument.getUuid(src, "audio");
-        RecordedAudio res = CommandUtil.loadAudio(player, id, src);
-        if (res != null) {
-            src.getSource().sendSuccess(() -> Component.literal("Loading audio with " + res.getDuration() + " seconds"), true);
-            String info = res.getAudioInfo();
-            src.getSource().sendSuccess(() -> Component.literal(info), false);
-        } else {
-            src.getSource().sendFailure(Component.literal("Audio " + id + " not found"));
-        }
+        src.getSource().sendSuccess(() -> Component.literal("Loading audio..."), false);
+        CommandUtil.loadAudio(player, id, src, (IRecordedAudio res) -> {
+            if(res != null) {
+                src.getSource().sendSuccess(() -> Component.literal("Loading audio with " + res.getDuration() + " seconds"), true);
+                String info = ((RecordedAudio)res).getAudioInfo();
+                src.getSource().sendSuccess(() -> Component.literal(info), false);
+            } else {
+                src.getSource().sendFailure(Component.literal("Audio " + id + " not found"));
+            }
+        });
         return 0;
     }
 }
