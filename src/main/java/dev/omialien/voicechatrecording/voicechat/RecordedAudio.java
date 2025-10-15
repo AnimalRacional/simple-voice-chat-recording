@@ -18,7 +18,6 @@ public class RecordedAudio implements IRecordedAudio {
     private final short[] audio;
     private final UUID id;
     private final UUID player;
-    private boolean saved;
     public RecordedAudio(short[] audio, UUID player){
         this(audio, player, UUID.randomUUID());
     }
@@ -27,7 +26,6 @@ public class RecordedAudio implements IRecordedAudio {
         this.audio = audio;
         this.player = player;
         this.id = id;
-        this.saved = false;
     }
 
     @Override
@@ -45,23 +43,19 @@ public class RecordedAudio implements IRecordedAudio {
         return this.id;
     }
 
-    public boolean wasSaved(){
-        return this.saved;
-    }
-
     @Override
-    public void saveAudio(String namespace){
-        if(!VoiceChatRecording.recordingApi.getPrivacy(this.player) && !saved){ // This method should only ever happen once per RecordedPlayer, no more no less
+    public boolean saveAudio(String namespace){
+        boolean privacy = VoiceChatRecording.recordingApi.getPrivacy(this.player);
+        if(!privacy){
             ((VoiceChatRecordingPlugin)VoiceChatRecording.recordingApi).saveAudio(namespace, this);
-            this.saved = true;
-        } else if(saved){
-            VoiceChatRecording.LOGGER.warn("Tried to save already-saved audio! {} by {}", getId(), getPlayerUUID());
+            return true;
         }
+        return false;
     }
 
     @Override
     public void unsaveAudio(String namespace) {
-        ((VoiceChatRecordingPlugin)VoiceChatRecording.recordingApi).unsaveAudio(namespace, this);
+        VoiceChatRecording.recordingApi.unsaveAudio(namespace, this);
     }
 
     @Override

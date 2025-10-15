@@ -35,13 +35,22 @@ public class SaveAudioCommand {
         UUID audioId = UuidArgument.getUuid(src, "audio");
         for(IRecordedAudio audio : VoiceChatRecording.storedAudios) {
             if(audio.getPlayerUUID().equals(player) && audio.getId().equals(audioId)) {
-                audio.saveAudio(VoiceChatRecording.MOD_ID);
-                StringBuilder builder = new StringBuilder("Saved audio ");
-                builder.append(audioId);
-                builder.append(" by ");
-                Player p = src.getSource().getLevel().getPlayerByUUID(player);
-                builder.append(p == null ? player : p.getName().getString());
-                src.getSource().sendSuccess(() -> Component.literal(builder.toString()), true);
+                boolean res = audio.saveAudio(VoiceChatRecording.MOD_ID);
+                if(res) {
+                    StringBuilder builder = new StringBuilder("Saved audio ");
+                    builder.append(audioId);
+                    builder.append(" by ");
+                    Player p = src.getSource().getLevel().getPlayerByUUID(player);
+                    builder.append(p == null ? player : p.getName().getString());
+                    src.getSource().sendSuccess(() -> Component.literal(builder.toString()), true);
+                } else {
+                    src.getSource().sendFailure(Component.literal("Could not save audio!"));
+                    if(VoiceChatRecording.recordingApi.getPrivacy(player)) {
+                        src.getSource().sendFailure(Component.literal("Player has privacy mode enabled"));
+                    } else {
+                        src.getSource().sendFailure(Component.literal("Unknown reason"));
+                    }
+                }
                 return 0;
             }
         }

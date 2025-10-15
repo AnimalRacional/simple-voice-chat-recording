@@ -366,7 +366,9 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin, VoiceChatRecor
             //TODO n há state() no java 17 isto so copia o metodo que eles tem mas verificar se ta certo
             if(cached.isDone() && !cached.isCancelled()){
                 try{
-                    MinecraftForge.EVENT_BUS.post(new AudioLoadedEvent(cached.get(), type, namespace));
+                    IRecordedAudio audio = cached.get();
+                    reaction.accept(audio);
+                    MinecraftForge.EVENT_BUS.post(new AudioLoadedEvent(audio, type, namespace));
                 } catch(Exception e) {
                     VoiceChatRecording.LOGGER.error("Error getting successfully finished audio from cache to event: {} {}", ids.getFirst(), ids.getSecond());
                     VoiceChatRecording.LOGGER.error("{}", e.getMessage());

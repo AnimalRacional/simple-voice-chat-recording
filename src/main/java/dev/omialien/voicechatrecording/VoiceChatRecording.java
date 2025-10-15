@@ -35,7 +35,7 @@ public class VoiceChatRecording {
     public VoiceChatRecording(FMLJavaModLoadingContext ctx){
         LOGGER.debug("FMLJavaModLoadingContext is being used!");
         ServerPayloadHandler.registerPackets();
-        ctx.registerConfig(ModConfig.Type.SERVER, RecordingCommonConfig.SPEC);
+        ctx.registerConfig(ModConfig.Type.COMMON, RecordingCommonConfig.SPEC);
         ctx.registerConfig(ModConfig.Type.CLIENT, RecordingClientConfig.SPEC);
         TASKS = new TaskScheduler();
     }
@@ -43,7 +43,7 @@ public class VoiceChatRecording {
     public VoiceChatRecording() {
         LOGGER.warn("Old version: not using FMLJavaModLoadingContext");
         ServerPayloadHandler.registerPackets();
-        ModLoadingContext.get().registerConfig(ModConfig.Type.SERVER, RecordingCommonConfig.SPEC);
+        ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, RecordingCommonConfig.SPEC);
         ModLoadingContext.get().registerConfig(ModConfig.Type.CLIENT, RecordingClientConfig.SPEC);
         TASKS = new TaskScheduler();
     }
