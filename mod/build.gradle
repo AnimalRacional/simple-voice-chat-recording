@@ -139,8 +139,6 @@ dependencies {
     // http://www.gradle.org/docs/current/userguide/dependency_management.html
     implementation "de.maxhenkel.voicechat:voicechat-api:${voicechat_api_version}"
     runtimeOnly "maven.modrinth:simple-voice-chat:${voicechat_dependency}"
-
-    implementation project(':api')
 }
 
 // This block of code expands all declared replace properties in the specified resource targets.
