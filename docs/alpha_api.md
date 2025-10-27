@@ -2,7 +2,7 @@
 This is still a pre-release, but the API shouldn't change too much in the final release; official documentation will be written later, but for now here is a simple overview of how to use it.
 ### Starting out
 First, add it as a dependency for your mod, through something like https://support.modrinth.com/en/articles/8801191-modrinth-maven or by having the mod's jar as a library in your workspace.
-This will add a new event, ``dev.omialien.voicechatrecording.api.events.RecordingSetupEvent``, which you can listen to just like any other NeoForge event. In here, you should use the ``RecordingSetupEvent#addCategory(String id, String name, String description, int[][] icon)`` to register your own volume category in the voice chat. For example:
+This will add a new event, ``dev.omialien.voicechatrecording_api.events.RecordingSetupEvent``, which you can listen to just like any other NeoForge event. In here, you should use the ``RecordingSetupEvent#addCategory(String id, String name, String description, int[][] icon)`` to register your own volume category in the voice chat. For example:
 
 ``event.addCategory(CoolMod.MODID, "Cool Mod Voices", "The volume of audios played through my cool mod", null)`` 
 
