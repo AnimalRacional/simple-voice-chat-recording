@@ -10,12 +10,12 @@ import dev.omialien.voicechatrecording.VoiceChatRecording;
 import dev.omialien.voicechatrecording.configs.RecordingCommonConfig;
 import dev.omialien.voicechatrecording.taskscheduler.TaskScheduler;
 import dev.omialien.voicechatrecording.voicechat.audio.AudioCache;
-import dev.omialien.voicechatrecording_api.IRecordedAudio;
-import dev.omialien.voicechatrecording_api.IRecordedPlayer;
-import dev.omialien.voicechatrecording_api.VoiceChatRecordingApi;
-import dev.omialien.voicechatrecording_api.events.AudioLoadedEvent;
-import dev.omialien.voicechatrecording_api.events.MicPacketReceivedEvent;
-import dev.omialien.voicechatrecording_api.events.RecordingSetupEvent;
+import dev.omialien.voicechatrecording.api.IRecordedAudio;
+import dev.omialien.voicechatrecording.api.IRecordedPlayer;
+import dev.omialien.voicechatrecording.api.VoiceChatRecordingApi;
+import dev.omialien.voicechatrecording.api.events.AudioLoadedEvent;
+import dev.omialien.voicechatrecording.api.events.MicPacketReceivedEvent;
+import dev.omialien.voicechatrecording.api.events.RecordingSetupEvent;
 import net.neoforged.neoforge.common.NeoForge;
 
 import javax.annotation.Nullable;

@@ -1,12 +1,12 @@
-package dev.omialien.voicechatrecording_api.util;
+package dev.omialien.voicechatrecording.api.util;
 
 import de.maxhenkel.voicechat.api.VoicechatServerApi;
 import de.maxhenkel.voicechat.api.audiochannel.AudioChannel;
 import de.maxhenkel.voicechat.api.audiochannel.EntityAudioChannel;
 import de.maxhenkel.voicechat.api.audiochannel.LocationalAudioChannel;
 import dev.omialien.voicechatrecording.VoiceChatRecording;
-import dev.omialien.voicechatrecording_api.IRecordedAudio;
-import dev.omialien.voicechatrecording_api.AudioEffect;
+import dev.omialien.voicechatrecording.api.IRecordedAudio;
+import dev.omialien.voicechatrecording.api.AudioEffect;
 import dev.omialien.voicechatrecording.voicechat.audio.AudioPlayer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Entity;

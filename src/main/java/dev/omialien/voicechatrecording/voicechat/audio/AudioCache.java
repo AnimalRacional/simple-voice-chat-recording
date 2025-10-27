@@ -3,7 +3,7 @@ package dev.omialien.voicechatrecording.voicechat.audio;
 import com.mojang.datafixers.util.Pair;
 import dev.omialien.voicechatrecording.VoiceChatRecording;
 import dev.omialien.voicechatrecording.configs.RecordingCommonConfig;
-import dev.omialien.voicechatrecording_api.IRecordedAudio;
+import dev.omialien.voicechatrecording.api.IRecordedAudio;
 
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;

@@ -5,7 +5,7 @@ import com.mojang.brigadier.context.CommandContext;
 import com.mojang.datafixers.util.Pair;
 import dev.omialien.voicechatrecording.VoiceChatRecording;
 import dev.omialien.voicechatrecording.voicechat.VoiceChatRecordingPlugin;
-import dev.omialien.voicechatrecording_api.IRecordedAudio;
+import dev.omialien.voicechatrecording.api.IRecordedAudio;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.commands.SharedSuggestionProvider;

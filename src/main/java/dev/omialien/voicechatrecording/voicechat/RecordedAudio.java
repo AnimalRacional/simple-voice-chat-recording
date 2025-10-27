@@ -3,8 +3,8 @@ package dev.omialien.voicechatrecording.voicechat;
 import com.mojang.datafixers.util.Pair;
 import dev.omialien.voicechatrecording.VoiceChatRecording;
 import dev.omialien.voicechatrecording.configs.RecordingCommonConfig;
-import dev.omialien.voicechatrecording_api.AudioEffect;
-import dev.omialien.voicechatrecording_api.IRecordedAudio;
+import dev.omialien.voicechatrecording.api.AudioEffect;
+import dev.omialien.voicechatrecording.api.IRecordedAudio;
 
 import javax.annotation.Nullable;
 import java.nio.file.Path;

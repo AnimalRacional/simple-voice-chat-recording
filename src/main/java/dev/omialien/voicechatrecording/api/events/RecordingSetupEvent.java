@@ -1,8 +1,8 @@
-package dev.omialien.voicechatrecording_api.events;
+package dev.omialien.voicechatrecording.api.events;
 
 import de.maxhenkel.voicechat.api.VolumeCategory;
 import dev.omialien.voicechatrecording.VoiceChatRecording;
-import dev.omialien.voicechatrecording_api.VoiceChatRecordingApi;
+import dev.omialien.voicechatrecording.api.VoiceChatRecordingApi;
 import net.neoforged.bus.api.Event;
 
 import javax.annotation.Nullable;

@@ -1,4 +1,4 @@
-package dev.omialien.voicechatrecording_api;
+package dev.omialien.voicechatrecording.api;
 
 import java.util.Random;
 

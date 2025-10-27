@@ -1,6 +1,6 @@
-package dev.omialien.voicechatrecording_api.events;
+package dev.omialien.voicechatrecording.api.events;
 
-import dev.omialien.voicechatrecording_api.IRecordedAudio;
+import dev.omialien.voicechatrecording.api.IRecordedAudio;
 
 public class AudioRecordedEvent extends AudioEvent {
     public AudioRecordedEvent(IRecordedAudio audio){
