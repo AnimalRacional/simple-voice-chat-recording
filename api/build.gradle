@@ -5,7 +5,7 @@ plugins {
     id 'idea'
 }
 
-version = "1.21.1-" + mod_version
+version = "1.21.1-" + mod_version + "_api"
 group = mod_group_id
 
 // Sets up a dependency configuration called 'localRuntime'.
@@ -46,12 +46,11 @@ neoForge {
 dependencies {
     implementation "de.maxhenkel.voicechat:voicechat-api:${voicechat_api_version}"
     runtimeOnly "maven.modrinth:simple-voice-chat:${voicechat_dependency}"
-    implementation project(':mod')
 }
 
 sourceSets.main.resources { srcDir 'src/generated/resources' }
+sourceSets.main.java { srcDir '../mod/src' }
 java {
-    archivesBaseName = mod_id + "_api"
     withSourcesJar()
 }
 
