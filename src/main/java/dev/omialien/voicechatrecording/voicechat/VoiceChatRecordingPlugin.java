@@ -41,8 +41,6 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin, VoiceChatRecor
     private ExecutorService audioLoader;
     public Map<String, Set<Pair<UUID, UUID>>> savedAudios;
     public Map<String, Set<RecordedAudio>> audiosToWriteToDisk;
-    // TODO is this queue really needed? check if the concurrenthashmap can handle both the saving thread removing audios, and mods adding new audios
-    private Queue<Pair<String, RecordedAudio>> audiosToSave;
     public TaskScheduler audioSavingTask;
     private boolean audioSavingTaskScheduled = false;
     private Thread audioSavingThread;
@@ -121,19 +119,7 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin, VoiceChatRecor
             VoiceChatRecording.LOGGER.info("Finished saving audios in {}ms", (double)(end-start)/1000000);
             audiosToWriteToDisk.clear();
             audioSavingTaskScheduled = false;
-            while(!audiosToSave.isEmpty()) {
-                if(!audioSavingTaskScheduled){
-                    audioSavingTaskScheduled = true;
-                    audioSavingTask.schedule(this::saveAudios, RecordingCommonConfig.AUDIO_SAVING_COOLDOWN.get());
-                }
-                Pair<String, RecordedAudio> pair = audiosToSave.remove();
-                if(!audiosToWriteToDisk.containsKey(pair.getFirst())) {
-                    audiosToWriteToDisk.put(pair.getFirst(), new HashSet<>());
-                }
-                audiosToWriteToDisk.get(pair.getFirst()).add(pair.getSecond());
-            }
-            Set<Pair<UUID, UUID>> allAudios = new HashSet<>();
-            savedAudios.values().forEach(allAudios::addAll);
+            Set<Pair<UUID, UUID>> allAudios = savedAudios.values().stream().flatMap(Collection::stream).collect(Collectors.toSet());
             try(DirectoryStream<Path> stream = Files.newDirectoryStream(basePath)) {
                 for(Path cur : stream) {
                     Pair<UUID, UUID> ids = RecordedAudio.getIdFromFile(cur);
@@ -163,14 +149,6 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin, VoiceChatRecor
         audioSavingTask = new TaskScheduler();
         audioSavingTaskScheduled = false;
         if(audioSavingThread == null || !audioSavingThread.isAlive()){
-            // Move all queued audios to the main map and run the thread on the main thread
-            while(!audiosToSave.isEmpty()) {
-                Pair<String, RecordedAudio> pair = audiosToSave.remove();
-                if(!audiosToWriteToDisk.containsKey(pair.getFirst())) {
-                    audiosToWriteToDisk.put(pair.getFirst(), new HashSet<>());
-                }
-                audiosToWriteToDisk.get(pair.getFirst()).add(pair.getSecond());
-            }
             createAudioSavingThread();
             audioSavingThread.start();
         }
@@ -180,8 +158,10 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin, VoiceChatRecor
     }
 
     public void shutdownAudioLoading() {
+        VoiceChatRecording.LOGGER.info("Shutting down audio loading...");
         audioLoader.shutdownNow();
         audioCache.interruptThread();
+        VoiceChatRecording.LOGGER.info("Shut down audio loading");
     }
 
     /**
@@ -203,7 +183,6 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin, VoiceChatRecor
         audioCache = new AudioCache();
         audiosToWriteToDisk = new ConcurrentHashMap<>();
         savedAudios = new ConcurrentHashMap<>();
-        audiosToSave = new ConcurrentLinkedQueue<>();
         audioSavingTask = new TaskScheduler();
         audioSavingTaskScheduled = false;
         audioLoader = Executors.newFixedThreadPool(RecordingCommonConfig.AUDIO_READER_THREAD_COUNT.get());
@@ -257,15 +236,13 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin, VoiceChatRecor
         savedAudios.get(namespace).add(new Pair<>(audio.getPlayerUUID(), audio.getId()));
         if(audioSavingThread.isAlive()) {
             // Thread is running, so we shouldn't mess with the hashmap, or we risk blocking here until it finishes saving
-            VoiceChatRecording.LOGGER.debug("thread is alive, adding to queue");
-            audiosToSave.add(new Pair<>(namespace, audio));
-        } else {
-            VoiceChatRecording.LOGGER.debug("adding saved audio to map");
-            if(!audiosToWriteToDisk.containsKey(namespace)) {
-                audiosToWriteToDisk.put(namespace, new HashSet<>());
-            }
-            audiosToWriteToDisk.get(namespace).add(audio);
+            VoiceChatRecording.LOGGER.warn("Added audio while saving!");
         }
+        VoiceChatRecording.LOGGER.debug("adding saved audio to map");
+        if(!audiosToWriteToDisk.containsKey(namespace)) {
+            audiosToWriteToDisk.put(namespace, new HashSet<>());
+        }
+        audiosToWriteToDisk.get(namespace).add(audio);
         if(!audioSavingTaskScheduled){
             audioSavingTaskScheduled = true;
             int cd = RecordingCommonConfig.AUDIO_SAVING_COOLDOWN.get();
@@ -276,7 +253,8 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin, VoiceChatRecor
 
     @Override
     public void unsaveAudio(String namespace, IRecordedAudio audio) {
-        // TODO if this is called before the audio gets written to disk, since it is still in audiosToWriteToDisk it will still be written to disk, although it'll be deleted right afterwards if no other namespace saves it
+        // TODO if this is called before the audio gets written to disk, since it is still in audiosToWriteToDisk it will still be written to disk,
+        //  although it'll be deleted right afterwards if no other namespace saves it
         //  We can't just remove it from there since it's possible some other namespace also saved it, so is it worth it dealing with this edge case?
         if(savedAudios.containsKey(namespace)) {
             savedAudios.get(namespace).remove(new Pair<>(audio.getPlayerUUID(), audio.getId()));
@@ -365,8 +343,9 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin, VoiceChatRecor
                 }
             }
         });
-        if(found.get() != null) {
-            return audioLoader.submit(found::get);
+        RecordedAudio foundAudio = found.get();
+        if(foundAudio != null) {
+            return audioLoader.submit(() -> foundAudio);
         }
         if(audioCache.isCached(ids)) {
             Future<IRecordedAudio> cached = audioCache.get(ids);
