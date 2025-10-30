@@ -73,6 +73,7 @@ public class AudioCache {
                 }
             }
         });
+        removalThread.setName("CacheRemovalThread");
         removalThread.start();
     }
 

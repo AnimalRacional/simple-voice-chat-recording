@@ -1,5 +1,6 @@
 package dev.omialien.voicechatrecording.voicechat;
 
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 import com.google.gson.stream.JsonReader;
@@ -52,9 +53,9 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin, VoiceChatRecor
         VoiceChatRecording.LOGGER.debug("Recreating saving thread");
         audioSavingThread = new Thread(() -> {
             VoiceChatRecording.LOGGER.debug("Running saving thread");
-            ExecutorService savePool = Executors.newFixedThreadPool(RecordingCommonConfig.AUDIO_SAVER_THREAD_COUNT.get());
             Path basePath = RecordedAudio.audiosPath;
             long start = System.nanoTime();
+            ExecutorService savePool = Executors.newFixedThreadPool(RecordingCommonConfig.AUDIO_SAVER_THREAD_COUNT.get(), new ThreadFactoryBuilder().setNameFormat("AudioSavingPool-%d").build());
             for(String namespace : savedAudios.keySet()) {
                 VoiceChatRecording.LOGGER.debug("Saving audios for namespace {}", namespace);
                 // Write the JSON file of the namespace
