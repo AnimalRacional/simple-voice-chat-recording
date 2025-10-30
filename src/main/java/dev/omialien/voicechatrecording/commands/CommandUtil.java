@@ -16,17 +16,18 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.function.Consumer;
+import java.util.function.Supplier;
 import java.util.stream.Stream;
 
 public class CommandUtil {
     // TODO maybe only get the audios in the API's namespace?
-    public static RequiredArgumentBuilder<CommandSourceStack, UUID> PLAYER_ARGUMENT =
-            Commands.argument("player",
+    public static Supplier<RequiredArgumentBuilder<CommandSourceStack, UUID>> PLAYER_ARGUMENT =
+            () -> Commands.argument("player",
                     UuidArgument.uuid()).suggests((src, suggestionsBuilder) ->
                     SharedSuggestionProvider.suggest(
                             CommandUtil.getAllSavedAudios().map((p) -> p.getFirst().toString()), suggestionsBuilder));
-    public static RequiredArgumentBuilder<CommandSourceStack, UUID> AUDIO_ARGUMENT =
-            Commands.argument("audio",
+    public static Supplier<RequiredArgumentBuilder<CommandSourceStack, UUID>> AUDIO_ARGUMENT =
+            () -> Commands.argument("audio",
                     UuidArgument.uuid()).suggests((src, suggestionsBuilder) ->
                     SharedSuggestionProvider.suggest(
                             CommandUtil.getAllSavedAudios().map((p) -> p.getSecond().toString()), suggestionsBuilder));
@@ -49,13 +50,7 @@ public class CommandUtil {
     }
 
     public static void loadAudio(UUID player, UUID id, CommandContext<CommandSourceStack> src, Consumer<IRecordedAudio> reaction) {
-        try {
-            VoiceChatRecording.recordingApi.loadAudio(player, id, reaction).get();
-        } catch (InterruptedException e) {
-            CommandUtil.sendInterruptFailure(src.getSource());
-        } catch (ExecutionException e) {
-            CommandUtil.sendLoadFailure(src.getSource());
-        }
+        VoiceChatRecording.recordingApi.loadAudio(player, id, reaction);
     }
 }
 
