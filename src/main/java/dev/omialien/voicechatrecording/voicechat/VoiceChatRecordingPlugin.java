@@ -325,24 +325,31 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin, VoiceChatRecor
 
     @Nullable
     private Future<IRecordedAudio> loadRawAudio(Pair<UUID, UUID> ids, AudioLoadedEvent.LoadType type, Consumer<IRecordedAudio> reaction, String namespace) {
-        Path audioPath = RecordedAudio.audiosPath.resolve(RecordedAudio.getFileName(ids.getFirst(), ids.getSecond()));
         VoiceChatRecording.LOGGER.debug("Checking cache...");
         // Check the savedAudiosCache, since if it's in there it most likely hasn't been written to disk
         RecordedAudio id = RecordedAudio.makeIdentificationAudio(ids.getFirst(), ids.getSecond());
         AtomicReference<RecordedAudio> found = new AtomicReference<>(null);
-        audiosToWriteToDisk.values().forEach((set) -> {
+        for(Set<RecordedAudio> set : audiosToWriteToDisk.values()) {
             // You can check if an element is in a set, but not retrieve it
-            if(set.contains(id)) {
+            if (set.contains(id)) {
+                VoiceChatRecording.LOGGER.debug("found set with it");
+                boolean gotIt = false;
                 for(RecordedAudio audio : set) {
                     if(audio.equals(id)) {
+                        VoiceChatRecording.LOGGER.debug("found it!");
                         found.set(audio);
-                        return;
+                        gotIt = true;
+                        break;
                     }
                 }
+                if(gotIt) {
+                    break;
+                }
             }
-        });
+        }
         RecordedAudio foundAudio = found.get();
         if(foundAudio != null) {
+            reaction.accept(foundAudio);
             return audioLoader.submit(() -> foundAudio);
         }
         if(audioCache.isCached(ids)) {
@@ -360,6 +367,7 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin, VoiceChatRecor
             return cached;
         }
         VoiceChatRecording.LOGGER.debug("Not in cache, adding");
+        Path audioPath = RecordedAudio.audiosPath.resolve(RecordedAudio.getFileName(ids.getFirst(), ids.getSecond()));
         audioCache.add(ids, audioLoader.submit(() -> {
             IRecordedAudio res = this.readAudioFromFile(audioPath, reaction, ids);
             NeoForge.EVENT_BUS.post(new AudioLoadedEvent(res, type, namespace));

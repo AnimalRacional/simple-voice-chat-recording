@@ -17,8 +17,8 @@ public class LoadAudioCommand {
     public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
         dispatcher.register(Commands.literal("loadAudio").
                 requires((src) -> src.hasPermission(PERMISSION_LEVEL))
-                .then(CommandUtil.PLAYER_ARGUMENT
-                        .then(CommandUtil.AUDIO_ARGUMENT.executes(LoadAudioCommand::executeCommand))));
+                .then(CommandUtil.PLAYER_ARGUMENT.get()
+                        .then(CommandUtil.AUDIO_ARGUMENT.get().executes(LoadAudioCommand::executeCommand))));
     }
 
     private static int executeCommand(CommandContext<CommandSourceStack> src) {

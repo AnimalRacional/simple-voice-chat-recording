@@ -17,8 +17,8 @@ public class AudioInfoCommand {
     public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
         dispatcher.register(Commands.literal("audioInfo").
                 requires((src) -> src.hasPermission(PERMISSION_LEVEL))
-                .then(CommandUtil.PLAYER_ARGUMENT
-                        .then(CommandUtil.AUDIO_ARGUMENT.executes(AudioInfoCommand::executeCommand))));
+                .then(CommandUtil.PLAYER_ARGUMENT.get()
+                        .then(CommandUtil.AUDIO_ARGUMENT.get().executes(AudioInfoCommand::executeCommand))));
     }
 
     private static int executeCommand(CommandContext<CommandSourceStack> src) {
