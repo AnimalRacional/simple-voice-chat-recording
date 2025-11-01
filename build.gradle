@@ -207,12 +207,25 @@ tasks.withType(JavaCompile).configureEach {
 }
 
 publishing {
+    repositories {
+        maven {
+            name "LocalRepo"
+            url "file://${project.projectDir}/repo"
+        }
+        maven {
+            name = "GitHubPackages"
+            url = uri("https://maven.pkg.github.com/AnimalRacional/simple-voice-chat-recording")
+            credentials {
+                username = project.findProperty("gpr.user") ?: System.getenv("USERNAME")
+                password = project.findProperty("gpr.key") ?: System.getenv("TOKEN")
+            }
+        }
+    }
     publications {
         maven(MavenPublication) {
             groupId = mod_group_id
-            artifactId = mod_id
-            version = mod_version
-
+            artifactId = artifact_id
+            version = "1.20.1-" + mod_version
             from components.java
         }
     }
