@@ -71,10 +71,12 @@ public class CommonEventBus {
 
     @SubscribeEvent
     public static void tickEvent(TickEvent.ServerTickEvent event){
-        VoiceChatRecording.TASKS.tick();
-        TaskScheduler scheduler = ((VoiceChatRecordingPlugin)(VoiceChatRecording.recordingApi)).audioSavingTask;
-        if(scheduler != null) {
-            scheduler.tick();
+        if ( event.phase == TickEvent.Phase.END ) {
+            VoiceChatRecording.TASKS.tick();
+            TaskScheduler scheduler = ((VoiceChatRecordingPlugin)(VoiceChatRecording.recordingApi)).audioSavingTask;
+            if(scheduler != null) {
+                scheduler.tick();
+            }
         }
     }
 
