@@ -43,7 +43,7 @@ public class AudioCache {
         if(this.removalThread.isAlive()) {
             this.removalThread.interrupt();
         } else {
-            VoiceChatRecording.LOGGER.error("Tried to interrupt cache removal thread while alive!");
+            VoiceChatRecording.LOGGER.error("Tried to interrupt cache removal thread while not alive!");
             VoiceChatRecording.LOGGER.error("interruption stacktrace: {}", (Object[]) Thread.currentThread().getStackTrace());
         }
     }
@@ -52,28 +52,31 @@ public class AudioCache {
         if(removalThread != null && removalThread.isAlive()) return;
         removalThread = new Thread(() -> {
             while(true) {
-                VoiceChatRecording.LOGGER.info("Removing old audios from cache");
                 long time = System.nanoTime();
                 // TODO maybe make this like the task scheduler works, keeping each entry sorted by time and only going through the ones that are to be removed
                 Set<Pair<UUID, UUID>> toRemove = new HashSet<>();
+                int audiosRemoved = 0;
                 for(Pair<UUID, UUID> curKey : audioLoadingCache.keySet()) {
                     CacheEntry cur = audioLoadingCache.get(curKey);
                     if(time - cur.getTime() >= ((long)RecordingCommonConfig.CACHE_REMOVAL_TIME.get()*1000000)) {
                         VoiceChatRecording.LOGGER.debug("Removing {}", curKey.getSecond());
+                        audiosRemoved++;
                         toRemove.add(curKey);
                     }
                 }
                 toRemove.forEach(audioLoadingCache::remove);
-                VoiceChatRecording.LOGGER.info("Finished removing old audios from cache");
+                if ( audiosRemoved > 0 ) {
+                    VoiceChatRecording.LOGGER.info("Finished removing {} old audios from cache", audiosRemoved);
+                }
                 try {
-                    Thread.sleep(Duration.of(RecordingCommonConfig.CACHE_CHECK_INTERVAL.get(), ChronoUnit.SECONDS));
+                    Thread.sleep(Duration.of(RecordingCommonConfig.CACHE_CHECK_INTERVAL.get(), ChronoUnit.SECONDS).toMillis());
                 } catch (InterruptedException e) {
                     VoiceChatRecording.LOGGER.warn("Interrupted cache removal thread, finishing");
                     return;
                 }
             }
         });
-        removalThread.setName("CacheRemovalThread");
+        removalThread.setName("AudioCacheRemovalThread");
         removalThread.start();
     }
 
