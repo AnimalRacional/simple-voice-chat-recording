@@ -3,6 +3,7 @@ package dev.omialien.voicechatrecording.commands;
 import com.mojang.authlib.GameProfile;
 import com.mojang.brigadier.CommandDispatcher;
 import dev.omialien.voicechatrecording.VoiceChatRecording;
+import dev.omialien.voicechatrecording.api.IRecordedPlayer;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.commands.SharedSuggestionProvider;
@@ -27,7 +28,14 @@ public class IsRecordingCommand {
             Collection<GameProfile> targets = GameProfileArgument.getGameProfiles(cmdSrc, "targets");
 
             for (GameProfile target : targets) {
-                sb.append(target.getName()).append(": ").append((VoiceChatRecording.recordingApi).getRecordedPlayer(target.getId()).isRecording());
+                IRecordedPlayer p = (VoiceChatRecording.recordingApi).getRecordedPlayer(target.getId());
+                String state;
+                if ( p == null ) {
+                    state = "Not Connected";
+                } else {
+                    state = String.valueOf(p.isRecording());
+                }
+                sb.append(target.getName()).append(": ").append(state);
                 if (targets.size() != 1) sb.append("\n");
             }
 

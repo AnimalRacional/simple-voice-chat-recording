@@ -272,12 +272,21 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin, VoiceChatRecor
         registration.registerEvent(PlayerDisconnectedEvent.class, this::onPlayerDisconnected, 100);
     }
 
+    long lastMessage = 0;
     private void onMicrophonePacket(MicrophonePacketEvent e){
         if (e.getSenderConnection() != null){ // If it's a player and not an entity
             RecordedPlayer recordedPlayer = recordedPlayers.get(e.getSenderConnection().getPlayer().getUuid());
-            recordedPlayer.recordPacket(e.getPacket().getOpusEncodedData());
-            MicPacketReceivedEvent ev = new MicPacketReceivedEvent(e);
-            NeoForge.EVENT_BUS.post(ev);
+            if ( recordedPlayer != null ) {
+                recordedPlayer.recordPacket(e.getPacket().getOpusEncodedData());
+                MicPacketReceivedEvent ev = new MicPacketReceivedEvent(e);
+                NeoForge.EVENT_BUS.post(ev);
+            } else {
+                long curTime = System.currentTimeMillis();
+                if ( curTime - lastMessage > 5000 ) {
+                    VoiceChatRecording.LOGGER.error("{} sent packet without being recorded!", e.getSenderConnection().getPlayer());
+                    lastMessage = curTime;
+                }
+            }
         }
     }
 
@@ -402,7 +411,7 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin, VoiceChatRecor
             VoiceChatRecording.LOGGER.warn("Tried to load from non-existent namespace {}", namespace);
             return Collections.emptySet();
         }
-        Set<Pair<UUID, UUID>> toLoad = savedAudios.get(namespace);
+        Set<Pair<UUID, UUID>> toLoad = savedAudios.getOrDefault(namespace, Collections.emptySet());
         Set<Future<IRecordedAudio>> loadedAudios = new HashSet<>(toLoad.size());
         for(Pair<UUID, UUID> cur : toLoad) {
             loadedAudios.add(loadRawAudio(cur, AudioLoadedEvent.LoadType.NAMESPACE, reaction, namespace));
@@ -499,14 +508,24 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin, VoiceChatRecor
     }
 
     public void stopRecording(UUID uuid) {
-        recordedPlayers.get(uuid).saveCurrentRecording();
-        VoiceChatRecording.LOGGER.debug("Stopped recording for player: {}", uuid.toString());
+        RecordedPlayer p = recordedPlayers.get(uuid);
+        if ( p != null ) {
+            p.saveCurrentRecording();
+            VoiceChatRecording.LOGGER.debug("Stopped recording for player: {}", uuid.toString());
+        } else {
+            VoiceChatRecording.LOGGER.warn("Stopped recording for non-recording player {}", uuid.toString());
+        }
 
     }
 
     public void startRecording(UUID uuid) {
-        recordedPlayers.get(uuid).startRecording();
-        VoiceChatRecording.LOGGER.debug("Recording started for player: {}", uuid.toString());
+        RecordedPlayer p = recordedPlayers.get(uuid);
+        if ( p != null ) {
+            p.startRecording();
+            VoiceChatRecording.LOGGER.debug("Recording started for player: {}", uuid.toString());
+        } else {
+            VoiceChatRecording.LOGGER.warn("Tried to start recording non-recording player {}", uuid.toString());
+        }
     }
 
     @Override
