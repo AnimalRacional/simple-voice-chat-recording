@@ -67,6 +67,8 @@ public class CommonEventBus {
         SaveAudioCommand.register(event.getDispatcher());
         AudioInfoCommand.register(event.getDispatcher());
         LoadAudioCommand.register(event.getDispatcher());
+        SetPrivacyCommand.register(event.getDispatcher());
+        GetPrivacyCommand.register(event.getDispatcher());
     }
 
     @SubscribeEvent

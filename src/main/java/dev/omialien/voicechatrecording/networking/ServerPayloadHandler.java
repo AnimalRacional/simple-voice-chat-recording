@@ -10,9 +10,13 @@ public class ServerPayloadHandler {
     public static final SimpleChannel INSTANCE = NetworkRegistry.newSimpleChannel(
             new ResourceLocation(VoiceChatRecording.MOD_ID, "main"),
             () -> PROTOCOL_VERSION,
-            PROTOCOL_VERSION::equals,
-            PROTOCOL_VERSION::equals
+            ServerPayloadHandler::checkVersion,
+            ServerPayloadHandler::checkVersion
     );
+
+    private static boolean checkVersion(String v) {
+        return v.equals(PROTOCOL_VERSION) || v.startsWith("ALLOWVANILLA") || v.startsWith("ABSENT");
+    }
 
     public static void registerPackets(){
         int id = 0;
