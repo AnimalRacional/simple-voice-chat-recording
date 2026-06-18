@@ -9,7 +9,6 @@ import de.maxhenkel.voicechat.api.*;
 import de.maxhenkel.voicechat.api.events.*;
 import dev.omialien.voicechatrecording.VoiceChatRecording;
 import dev.omialien.voicechatrecording.configs.RecordingCommonConfig;
-import dev.omialien.voicechatrecording.taskscheduler.TaskScheduler;
 import dev.omialien.voicechatrecording.voicechat.audio.AudioCache;
 import dev.omialien.voicechatrecording.api.IRecordedAudio;
 import dev.omialien.voicechatrecording.api.IRecordedPlayer;
@@ -19,7 +18,6 @@ import dev.omialien.voicechatrecording.api.events.MicPacketReceivedEvent;
 import dev.omialien.voicechatrecording.api.events.RecordingSetupEvent;
 import net.neoforged.neoforge.common.NeoForge;
 
-import javax.annotation.Nullable;
 import java.io.*;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -29,9 +27,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.*;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
-import java.util.stream.Collectors;
 
 @ForgeVoicechatPlugin
 public class VoiceChatRecordingPlugin implements VoicechatPlugin, VoiceChatRecordingApi {
@@ -39,103 +35,9 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin, VoiceChatRecor
     private Map<UUID, RecordedPlayer> recordedPlayers;
     private Map<UUID, Boolean> privacyMode;
     private ExecutorService audioLoader;
+    private ExecutorService audioSaver;
     public Map<String, Set<Pair<UUID, UUID>>> savedAudios;
-    public Map<String, Set<RecordedAudio>> audiosToWriteToDisk;
-    public TaskScheduler audioSavingTask;
-    private boolean audioSavingTaskScheduled = false;
-    private Thread audioSavingThread;
     private AudioCache audioCache;
-
-    private void createAudioSavingThread() {
-        // TODO maybe instead of creating a thread every time make a separate thread that is always running while in a server
-        VoiceChatRecording.LOGGER.debug("Recreating saving thread");
-        audioSavingThread = new Thread(() -> {
-            VoiceChatRecording.LOGGER.debug("Running saving thread");
-            Path basePath = RecordedAudio.audiosPath;
-            long start = System.nanoTime();
-            ExecutorService savePool = Executors.newFixedThreadPool(RecordingCommonConfig.AUDIO_SAVER_THREAD_COUNT.get(), new ThreadFactoryBuilder().setNameFormat("AudioSavingPool-%d").build());
-            for(String namespace : savedAudios.keySet()) {
-                VoiceChatRecording.LOGGER.debug("Saving audios for namespace {}", namespace);
-                // Write the JSON file of the namespace
-                Set<Pair<UUID, UUID>> audioIds = savedAudios.get(namespace);
-
-                try {
-                    Path namespacePath = basePath.resolve(String.format("%s.json", namespace));
-                    Files.deleteIfExists(namespacePath);
-                    PrintWriter writer = new PrintWriter(namespacePath.toFile());
-                    Set<Pair<UUID, UUID>> audios = audioIds.stream().map((audio) -> new Pair<>(audio.getFirst(), audio.getSecond())).collect(Collectors.toSet());
-                    writer.println(gson.toJson(audios));
-                    writer.close();
-                    VoiceChatRecording.LOGGER.debug("Wrote namespace file {}.json with {} audios", namespace, audios.size());
-                } catch (IOException e) {
-                    VoiceChatRecording.LOGGER.error("Couldn't save json file for namespace {}!", namespace);
-                    VoiceChatRecording.LOGGER.error("{}", e.getMessage());
-                }
-                // Save the audio files
-                if(!audiosToWriteToDisk.containsKey(namespace)){
-                    VoiceChatRecording.LOGGER.debug("No new audios to save for {}", namespace);
-                    continue;
-                }
-                Set<RecordedAudio> audios = audiosToWriteToDisk.get(namespace);
-                for(RecordedAudio audio : audios) {
-                    Path audioPath = basePath.resolve(audio.fileName());
-                    if(!Files.exists(audioPath)) {
-                        try {
-                            Files.createFile(audioPath);
-                            savePool.submit(() -> {
-                                VoiceChatRecording.LOGGER.debug("saving {}", audioPath);
-                                try {
-                                    try (FileOutputStream fos = new FileOutputStream(audioPath.toFile())) {
-                                        FileChannel out = fos.getChannel();
-                                        short[] audioData = audio.getAudio();
-                                        ByteBuffer buffer = ByteBuffer.allocate(audioData.length * 2);
-                                        buffer.order(ByteOrder.BIG_ENDIAN).asShortBuffer().put(audioData);
-                                        long written = 0;
-                                        while(written < audioData.length * 2L) {
-                                            written += out.write(buffer);
-                                        }
-                                    }
-                                    VoiceChatRecording.LOGGER.debug("Finished writing {} to file", audioPath);
-                                } catch (FileNotFoundException e) {
-                                    VoiceChatRecording.LOGGER.error("Couldn't find newly created file? {}", audioPath);
-                                    VoiceChatRecording.LOGGER.error("{}", e.getMessage());
-                                } catch (IOException e) {
-                                    VoiceChatRecording.LOGGER.error("Error writing file! {}", audioPath);
-                                    VoiceChatRecording.LOGGER.error("{}", e.getMessage());
-                                }
-                            });
-                        } catch (IOException e) {
-                            VoiceChatRecording.LOGGER.error("Error creating audio file {} !", audioPath);
-                            VoiceChatRecording.LOGGER.error("{}", e.getMessage());
-                        }
-                    } else {
-                        VoiceChatRecording.LOGGER.debug("Audio {} already exists, UUIDs are the same so content must be the same", audioPath);
-                    }
-                }
-            }
-
-            savePool.close();
-            long end = System.nanoTime();
-            VoiceChatRecording.LOGGER.info("Finished saving audios in {}ms", (double)(end-start)/1000000);
-            audiosToWriteToDisk.clear();
-            audioSavingTaskScheduled = false;
-            Set<Pair<UUID, UUID>> allAudios = savedAudios.values().stream().flatMap(Collection::stream).collect(Collectors.toSet());
-            try(DirectoryStream<Path> stream = Files.newDirectoryStream(basePath)) {
-                for(Path cur : stream) {
-                    Pair<UUID, UUID> ids = RecordedAudio.getIdFromFile(cur);
-                    if(ids != null) {
-                        if(!allAudios.contains(ids)) {
-                            VoiceChatRecording.LOGGER.info("Deleting unsaved audio file {}", cur);
-                            Files.delete(cur);
-                        }
-                    }
-                }
-            } catch(IOException e) {
-                VoiceChatRecording.LOGGER.error("Couldn't open audio directory for file deletion");
-            }
-        });
-        audioSavingThread.setName("Audio Saving Thread");
-    }
 
     /**
      * @return the unique ID for this voice chat plugin
@@ -146,20 +48,26 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin, VoiceChatRecor
     }
 
     public void shutdownSaving() throws InterruptedException {
-        audioSavingTask = new TaskScheduler();
-        audioSavingTaskScheduled = false;
-        if(audioSavingThread == null || !audioSavingThread.isAlive()){
-            createAudioSavingThread();
-            audioSavingThread.start();
+        long start = System.nanoTime();
+        VoiceChatRecording.LOGGER.info("Shutting down audio saving");
+        audioSaver.shutdown();
+        try {
+            if (!audioSaver.awaitTermination(20, TimeUnit.SECONDS)) {
+                VoiceChatRecording.LOGGER.error("Shutting down audio saving took too long! Data may be lost");
+            }
+        } catch (InterruptedException e) {
+            VoiceChatRecording.LOGGER.error("Audio saving was unexpectedly interrupted: {}", e.getMessage());
         }
-        // Thread is running, wait for it to finish
-        VoiceChatRecording.LOGGER.info("Running audio saving thread before shutdown...");
-        audioSavingThread.join();
+        long elapsed = System.nanoTime() - start;
+        VoiceChatRecording.LOGGER.info("Shut down audio saving in {}ms", TimeUnit.MILLISECONDS.convert(elapsed, TimeUnit.NANOSECONDS));
     }
 
     public void shutdownAudioLoading() {
         VoiceChatRecording.LOGGER.info("Shutting down audio loading...");
-        audioLoader.shutdownNow();
+        int count = audioLoader.shutdownNow().size();
+        if (count > 0) {
+            VoiceChatRecording.LOGGER.warn("{} audios were not loaded due to shutdown", count);
+        }
         audioCache.interruptThread();
         VoiceChatRecording.LOGGER.info("Shut down audio loading");
     }
@@ -181,21 +89,11 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin, VoiceChatRecor
         VoiceChatRecording.recordingApi = this;
         if(audioCache != null) audioCache.interruptThread();
         audioCache = new AudioCache();
-        audiosToWriteToDisk = new ConcurrentHashMap<>();
         savedAudios = new ConcurrentHashMap<>();
-        audioSavingTask = new TaskScheduler();
-        audioSavingTaskScheduled = false;
         audioLoader = Executors.newFixedThreadPool(RecordingCommonConfig.AUDIO_READER_THREAD_COUNT.get(), new ThreadFactoryBuilder().setNameFormat("AudioLoadingPool-%d").build());
-        if(audioSavingThread != null && audioSavingThread.isAlive()){
-            try {
-                VoiceChatRecording.LOGGER.debug("joining saving thread");
-                audioSavingThread.join();
-                VoiceChatRecording.LOGGER.debug("finished join");
-            } catch (InterruptedException e) {
-                throw new RuntimeException(e);
-            }
-        }
-        createAudioSavingThread();
+        audioSaver = Executors.newFixedThreadPool(RecordingCommonConfig.AUDIO_SAVER_THREAD_COUNT.get(), new ThreadFactoryBuilder().setNameFormat("AudioSavingPool-%d").build());
+        recordedPlayers = new ConcurrentHashMap<>();
+        privacyMode = new ConcurrentHashMap<>();
 
         try {
             loadNamespaceFiles();
@@ -203,8 +101,6 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin, VoiceChatRecor
             throw new RuntimeException(e);
         }
 
-        recordedPlayers = new ConcurrentHashMap<>();
-        privacyMode = new ConcurrentHashMap<>();
         VoiceChatRecording.LOGGER.debug("STARTING SCHEDULER");
         VoiceChatRecording.TASKS.schedule(this::checkForSilence, 20);
         RecordingSetupEvent eventResult = NeoForge.EVENT_BUS.post(new RecordingSetupEvent(this));
@@ -216,37 +112,71 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin, VoiceChatRecor
         }
     }
 
-    private void saveAudios() {
-        if(audioSavingThread.isAlive()) {
-            VoiceChatRecording.LOGGER.warn("Tried to save audios while thread was started: trying again in 5 minutes");
-            audioSavingTask.schedule(this::saveAudios, RecordingCommonConfig.AUDIO_SAVING_COOLDOWN.get());
+    private void writeAudio(RecordedAudio audio, Path basePath) {
+        Path path = basePath.resolve(audio.fileName());
+        if (!Files.exists(path)) {
+            try {
+                long start = System.nanoTime();
+                try (FileOutputStream fos = new FileOutputStream(path.toFile())) {
+                    FileChannel out = fos.getChannel();
+                    short[] audioData = audio.getAudio();
+                    ByteBuffer buffer = ByteBuffer.allocate(audioData.length * 2);
+                    buffer.order(ByteOrder.BIG_ENDIAN).asShortBuffer().put(audioData);
+                    long written = 0;
+                    int count = 0;
+                    while(written < audioData.length * 2L) {
+                        written += out.write(buffer);
+                        count += 1;
+                    }
+                    VoiceChatRecording.LOGGER.debug("Took {} writes to write to file", count);
+                }
+                long elapsed = System.nanoTime() - start;
+                VoiceChatRecording.LOGGER.debug("Finished writing {} to file in {}ms", path, TimeUnit.MILLISECONDS.convert(elapsed, TimeUnit.NANOSECONDS));
+            } catch (FileNotFoundException e) {
+                VoiceChatRecording.LOGGER.error("Couldn't find newly created file? {}", path);
+                VoiceChatRecording.LOGGER.error("{}", e.getMessage());
+            } catch (IOException e) {
+                VoiceChatRecording.LOGGER.error("Error writing file! {}", path);
+                VoiceChatRecording.LOGGER.error("{}", e.getMessage());
+            }
         } else {
-            createAudioSavingThread();
-            audioSavingThread.start();
+            VoiceChatRecording.LOGGER.debug("Audio {} already exists", path);
         }
+    }
+
+    public void writeNamespaceFile(String namespace, Path basePath) {
+        long start = System.nanoTime();
+        Path path = basePath.resolve(namespace + ".json");
+        Set<Pair<UUID, UUID>> audios = savedAudios.get(namespace);
+        try {
+            PrintWriter writer = new PrintWriter(path.toFile());
+            writer.println(gson.toJson(audios));
+            writer.close();
+            VoiceChatRecording.LOGGER.debug("Wrote namespace file {}.json with {} audios", namespace, audios.size());
+        } catch (IOException e) {
+            VoiceChatRecording.LOGGER.error("Couldn't save json file for namespace {}!", namespace);
+            VoiceChatRecording.LOGGER.error("{}", e.getMessage());
+        }
+        long elapsed = System.nanoTime() - start;
+        VoiceChatRecording.LOGGER.debug("Wrote namespace file for {} in {}ms", namespace, TimeUnit.MILLISECONDS.convert(elapsed, TimeUnit.NANOSECONDS));
     }
 
     public void saveAudio(String namespace, RecordedAudio audio){
         VoiceChatRecording.LOGGER.debug("PLUGIN saving audio {} {}", namespace, audio.getId());
-        if(!savedAudios.containsKey(namespace)) {
-            savedAudios.put(namespace, new HashSet<>());
+        savedAudios.computeIfAbsent(namespace, (k) -> ConcurrentHashMap.newKeySet());
+        Pair<UUID, UUID> ids = new Pair<>(audio.getPlayerUUID(), audio.getId());
+        Set<Pair<UUID, UUID>> namespaceAudios = savedAudios.get(namespace);
+        boolean updateNamespace = !namespaceAudios.contains(ids);
+        if (updateNamespace) {
+            namespaceAudios.add(ids);
         }
-        savedAudios.get(namespace).add(new Pair<>(audio.getPlayerUUID(), audio.getId()));
-        if(audioSavingThread.isAlive()) {
-            // Thread is running, so we shouldn't mess with the hashmap, or we risk blocking here until it finishes saving
-            VoiceChatRecording.LOGGER.warn("Added audio while saving!");
-        }
-        VoiceChatRecording.LOGGER.debug("adding saved audio to map");
-        if(!audiosToWriteToDisk.containsKey(namespace)) {
-            audiosToWriteToDisk.put(namespace, new HashSet<>());
-        }
-        audiosToWriteToDisk.get(namespace).add(audio);
-        if(!audioSavingTaskScheduled){
-            audioSavingTaskScheduled = true;
-            int cd = RecordingCommonConfig.AUDIO_SAVING_COOLDOWN.get();
-            VoiceChatRecording.LOGGER.info("Audios will be saved in {} seconds...", cd/20);
-            audioSavingTask.schedule(this::saveAudios, cd);
-        }
+        audioCache.add(ids, audioSaver.submit(() -> audio));
+        audioSaver.submit(() -> {
+            writeAudio(audio, RecordedAudio.audiosPath);
+            if (updateNamespace) {
+                writeNamespaceFile(namespace, RecordedAudio.audiosPath);
+            }
+        });
     }
 
     @Override
@@ -254,6 +184,7 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin, VoiceChatRecor
         if(savedAudios.containsKey(namespace)) {
             Pair<UUID, UUID> id = new Pair<>(playerUUID, audioId);
             savedAudios.get(namespace).remove(id);
+            writeNamespaceFile(namespace, RecordedAudio.audiosPath);
             boolean stillSaved = savedAudios.entrySet().stream().anyMatch((p) -> p.getValue().contains(id));
             if (!stillSaved) {
                 try {
@@ -297,16 +228,18 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin, VoiceChatRecor
     }
 
     private void loadNamespaceFiles() throws IOException {
+        long start = System.nanoTime();
         Path basePath = RecordedAudio.audiosPath;
         try (DirectoryStream<Path> directoryStream = Files.newDirectoryStream(basePath)) {
             for(Path curNamespace : directoryStream) {
                 String filename = curNamespace.getFileName().toString();
+                VoiceChatRecording.LOGGER.debug("Checking potential namespace file {}", filename);
                 if(filename.endsWith(".json")) {
                     String namespace = filename.substring(0, filename.lastIndexOf('.'));
-                    VoiceChatRecording.LOGGER.info("Loading namespace {}", namespace);
                     JsonReader reader = new JsonReader(new FileReader(curNamespace.toFile()));
                     Set<Pair<UUID, UUID>> audioIds = gson.fromJson(reader, new TypeToken<Set<Pair<UUID, UUID>>>(){}.getType());
-                    if(!savedAudios.containsKey(namespace)) { savedAudios.put(namespace, new HashSet<>()); }
+                    VoiceChatRecording.LOGGER.info("Loading namespace {}: {} audios", namespace, audioIds.size());
+                    if(!savedAudios.containsKey(namespace)) { savedAudios.put(namespace, ConcurrentHashMap.newKeySet()); }
                     for(Pair<UUID, UUID> id : audioIds){
                         savedAudios.get(namespace).add(id);
                         VoiceChatRecording.LOGGER.debug("{}: {} {}", namespace, id.getFirst(), id.getSecond());
@@ -314,6 +247,8 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin, VoiceChatRecor
                 }
             }
         }
+        long elapsed = System.nanoTime() - start;
+        VoiceChatRecording.LOGGER.info("Loaded namespaces in {}ms", TimeUnit.MILLISECONDS.convert(elapsed, TimeUnit.NANOSECONDS));
     }
 
     private IRecordedAudio readAudioFromFile(Path audioPath, Consumer<IRecordedAudio> reaction, Pair<UUID, UUID> ids) {
@@ -338,35 +273,9 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin, VoiceChatRecor
         return audioObj;
     }
 
-    @Nullable
     private Future<IRecordedAudio> loadRawAudio(Pair<UUID, UUID> ids, AudioLoadedEvent.LoadType type, Consumer<IRecordedAudio> reaction, String namespace) {
         VoiceChatRecording.LOGGER.debug("Checking cache...");
         // Check the savedAudiosCache, since if it's in there it most likely hasn't been written to disk
-        RecordedAudio id = RecordedAudio.makeIdentificationAudio(ids.getFirst(), ids.getSecond());
-        AtomicReference<RecordedAudio> found = new AtomicReference<>(null);
-        for(Set<RecordedAudio> set : audiosToWriteToDisk.values()) {
-            // You can check if an element is in a set, but not retrieve it
-            if (set.contains(id)) {
-                VoiceChatRecording.LOGGER.debug("found set with it");
-                boolean gotIt = false;
-                for(RecordedAudio audio : set) {
-                    if(audio.equals(id)) {
-                        VoiceChatRecording.LOGGER.debug("found it!");
-                        found.set(audio);
-                        gotIt = true;
-                        break;
-                    }
-                }
-                if(gotIt) {
-                    break;
-                }
-            }
-        }
-        RecordedAudio foundAudio = found.get();
-        if(foundAudio != null) {
-            reaction.accept(foundAudio);
-            return audioLoader.submit(() -> foundAudio);
-        }
         Optional<Future<IRecordedAudio>> optCached = audioCache.get(ids);
         if(optCached.isPresent()) {
             Future<IRecordedAudio> cached = optCached.get();
