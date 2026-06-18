@@ -71,8 +71,6 @@ public class CommonEventBus {
         SaveAudioCommand.register(event.getDispatcher());
         AudioInfoCommand.register(event.getDispatcher());
         LoadAudioCommand.register(event.getDispatcher());
-        SetPrivacyCommand.register(event.getDispatcher());
-        GetPrivacyCommand.register(event.getDispatcher());
     }
 
     @SubscribeEvent
@@ -86,7 +84,7 @@ public class CommonEventBus {
 
     @SubscribeEvent
     public static void registerPayloads(RegisterPayloadHandlersEvent e){
-        final PayloadRegistrar registrar = e.registrar("1").optional();
+        final PayloadRegistrar registrar = e.registrar("1");
         registrar.playToServer(
                 PrivacyModePacket.TYPE,
                 PrivacyModePacket.STREAM_CODEC,
