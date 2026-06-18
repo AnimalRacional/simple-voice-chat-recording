@@ -71,6 +71,7 @@ public class CommonEventBus {
         SaveAudioCommand.register(event.getDispatcher());
         AudioInfoCommand.register(event.getDispatcher());
         LoadAudioCommand.register(event.getDispatcher());
+        UnsaveAudioCommand.register(event.getDispatcher());
     }
 
     @SubscribeEvent

@@ -55,7 +55,7 @@ public class RecordedAudio implements IRecordedAudio {
 
     @Override
     public void unsaveAudio(String namespace) {
-        VoiceChatRecording.recordingApi.unsaveAudio(namespace, this);
+        VoiceChatRecording.recordingApi.unsaveAudio(namespace, this.player, this.id);
     }
 
     @Override
