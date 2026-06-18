@@ -7,10 +7,7 @@ import dev.omialien.voicechatrecording.api.IRecordedAudio;
 
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
-import java.util.UUID;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Future;
 
@@ -80,13 +77,13 @@ public class AudioCache {
         removalThread.start();
     }
 
-    public Future<IRecordedAudio> get(Pair<UUID, UUID> ids) {
+    public Optional<Future<IRecordedAudio>> get(Pair<UUID, UUID> ids) {
         if(audioLoadingCache.containsKey(ids)) {
             CacheEntry entry = audioLoadingCache.get(ids);
             entry.refresh();
-            return entry.getAudio();
+            return Optional.of(entry.getAudio());
         }
-        return null;
+        return Optional.empty();
     }
 
     public boolean isCached(Pair<UUID, UUID> ids) { return audioLoadingCache.containsKey(ids); }

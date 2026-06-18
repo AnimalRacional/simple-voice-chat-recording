@@ -185,7 +185,7 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin, VoiceChatRecor
         savedAudios = new ConcurrentHashMap<>();
         audioSavingTask = new TaskScheduler();
         audioSavingTaskScheduled = false;
-        audioLoader = Executors.newFixedThreadPool(RecordingCommonConfig.AUDIO_READER_THREAD_COUNT.get());
+        audioLoader = Executors.newFixedThreadPool(RecordingCommonConfig.AUDIO_READER_THREAD_COUNT.get(), new ThreadFactoryBuilder().setNameFormat("AudioLoadingPool-%d").build());
         if(audioSavingThread != null && audioSavingThread.isAlive()){
             try {
                 VoiceChatRecording.LOGGER.debug("joining saving thread");
@@ -361,8 +361,9 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin, VoiceChatRecor
             reaction.accept(foundAudio);
             return audioLoader.submit(() -> foundAudio);
         }
-        if(audioCache.isCached(ids)) {
-            Future<IRecordedAudio> cached = audioCache.get(ids);
+        Optional<Future<IRecordedAudio>> optCached = audioCache.get(ids);
+        if(optCached.isPresent()) {
+            Future<IRecordedAudio> cached = optCached.get();
             if(cached.state() == Future.State.SUCCESS){
                 try{
                     IRecordedAudio audio = cached.get();
@@ -377,13 +378,13 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin, VoiceChatRecor
         }
         VoiceChatRecording.LOGGER.debug("Not in cache, adding");
         Path audioPath = RecordedAudio.audiosPath.resolve(RecordedAudio.getFileName(ids.getFirst(), ids.getSecond()));
-        audioCache.add(ids, audioLoader.submit(() -> {
+        Future<IRecordedAudio> result = audioLoader.submit(() -> {
             IRecordedAudio res = this.readAudioFromFile(audioPath, reaction, ids);
             NeoForge.EVENT_BUS.post(new AudioLoadedEvent(res, type, namespace));
             return res;
-        }));
-        VoiceChatRecording.LOGGER.debug("Added");
-        return audioCache.get(ids);
+        });
+        audioCache.add(ids, result);
+        return result;
     }
 
     private Future<IRecordedAudio> loadRawAudio(Pair<UUID, UUID> ids, AudioLoadedEvent.LoadType type, Consumer<IRecordedAudio> reaction){
