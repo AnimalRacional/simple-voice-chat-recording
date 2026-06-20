@@ -1,8 +1,7 @@
 package dev.omialien.voicechatrecording.commands;
 
 import com.mojang.brigadier.builder.RequiredArgumentBuilder;
-import com.mojang.brigadier.context.CommandContext;
-import com.mojang.datafixers.util.Pair;
+import dev.omialien.voicechatrecording.AudioId;
 import dev.omialien.voicechatrecording.VoiceChatRecording;
 import dev.omialien.voicechatrecording.voicechat.VoiceChatRecordingPlugin;
 import dev.omialien.voicechatrecording.api.IRecordedAudio;
@@ -10,11 +9,9 @@ import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.commands.SharedSuggestionProvider;
 import net.minecraft.commands.arguments.UuidArgument;
-import net.minecraft.network.chat.Component;
 
 import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.ExecutionException;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
@@ -25,14 +22,14 @@ public class CommandUtil {
             () -> Commands.argument("player",
                     UuidArgument.uuid()).suggests((src, suggestionsBuilder) ->
                     SharedSuggestionProvider.suggest(
-                            CommandUtil.getAllSavedAudios().map((p) -> p.getFirst().toString()), suggestionsBuilder));
+                            CommandUtil.getAllSavedAudios().map((p) -> p.player().toString()), suggestionsBuilder));
     public static Supplier<RequiredArgumentBuilder<CommandSourceStack, UUID>> AUDIO_ARGUMENT =
             () -> Commands.argument("audio",
                     UuidArgument.uuid()).suggests((src, suggestionsBuilder) ->
                     SharedSuggestionProvider.suggest(
-                            CommandUtil.getAllSavedAudios().map((p) -> p.getSecond().toString()), suggestionsBuilder));
+                            CommandUtil.getAllSavedAudios().map((p) -> p.audio().toString()), suggestionsBuilder));
 
-    public static Stream<Pair<UUID, UUID>> getAllSavedAudios() {
+    public static Stream<AudioId> getAllSavedAudios() {
         return ((VoiceChatRecordingPlugin) VoiceChatRecording.recordingApi).savedAudios.values().stream()
                 .flatMap(Set::stream);
     }
@@ -41,19 +38,11 @@ public class CommandUtil {
         return VoiceChatRecording.storedAudios.stream();
     }
 
-    public static Stream<Pair<UUID, UUID>> getSavedAudios(String namespace) {
+    public static Stream<AudioId> getSavedAudios(String namespace) {
         return VoiceChatRecording.recordingApi.getNamespaceAudios(namespace).stream();
     }
 
-    public static void sendInterruptFailure(CommandSourceStack src) {
-        src.sendFailure(Component.literal("Audio loading was interrupted!"));
-    }
-
-    public static void sendLoadFailure(CommandSourceStack src) {
-        src.sendFailure(Component.literal("There was an error during audio loading!"));
-    }
-
-    public static void loadAudio(UUID player, UUID id, CommandContext<CommandSourceStack> src, Consumer<IRecordedAudio> reaction) {
+    public static void loadAudio(UUID player, UUID id, Consumer<IRecordedAudio> reaction) {
         VoiceChatRecording.recordingApi.loadAudio(player, id, reaction);
     }
 }

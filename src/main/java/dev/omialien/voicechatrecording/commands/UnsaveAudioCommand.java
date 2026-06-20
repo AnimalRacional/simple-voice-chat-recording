@@ -3,13 +3,11 @@ package dev.omialien.voicechatrecording.commands;
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.context.CommandContext;
 import dev.omialien.voicechatrecording.VoiceChatRecording;
-import dev.omialien.voicechatrecording.api.IRecordedAudio;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.commands.SharedSuggestionProvider;
 import net.minecraft.commands.arguments.UuidArgument;
 import net.minecraft.network.chat.Component;
-import net.minecraft.world.entity.player.Player;
 
 import java.util.UUID;
 
@@ -21,12 +19,12 @@ public class UnsaveAudioCommand {
                         Commands.argument("player",
                                         UuidArgument.uuid()).suggests((src, suggestionsBuilder) ->
                                         SharedSuggestionProvider.suggest(
-                                                CommandUtil.getSavedAudios(VoiceChatRecording.MOD_ID).map(r -> r.getFirst().toString()), suggestionsBuilder))
+                                                CommandUtil.getSavedAudios(VoiceChatRecording.MOD_ID).map(r -> r.player().toString()), suggestionsBuilder))
                                 .then(
                                         Commands.argument("audio",
                                                         UuidArgument.uuid()).suggests((src, suggestionsBuilder) ->
                                                         SharedSuggestionProvider.suggest(
-                                                                CommandUtil.getSavedAudios(VoiceChatRecording.MOD_ID).map(r -> r.getSecond().toString()), suggestionsBuilder))
+                                                                CommandUtil.getSavedAudios(VoiceChatRecording.MOD_ID).map(r -> r.audio().toString()), suggestionsBuilder))
                                                 .executes(UnsaveAudioCommand::runCommand))));
     }
 

@@ -25,7 +25,7 @@ public class LoadAudioCommand {
         UUID player = UuidArgument.getUuid(src, "player");
         UUID id = UuidArgument.getUuid(src, "audio");
         src.getSource().sendSuccess(() -> Component.literal("Loading audio..."), false);
-        CommandUtil.loadAudio(player, id, src, (IRecordedAudio res) -> {
+        CommandUtil.loadAudio(player, id, (IRecordedAudio res) -> {
             if(res != null) {
                 src.getSource().sendSuccess(() -> Component.literal("Loading audio with " + res.getDuration() + " seconds"), true);
                 String info = ((RecordedAudio)res).getAudioInfo();

@@ -1,15 +1,13 @@
 package dev.omialien.voicechatrecording.commands;
 
 import com.mojang.brigadier.CommandDispatcher;
-import com.mojang.datafixers.util.Pair;
+import dev.omialien.voicechatrecording.AudioId;
 import dev.omialien.voicechatrecording.VoiceChatRecording;
 import dev.omialien.voicechatrecording.voicechat.VoiceChatRecordingPlugin;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Player;
-
-import java.util.UUID;
 
 public class ListAudiosCommand {
     private static final int PERMS = 2;
@@ -21,11 +19,11 @@ public class ListAudiosCommand {
                 .executes((src) -> {
                     for(String namespace : ((VoiceChatRecordingPlugin)VoiceChatRecording.recordingApi).savedAudios.keySet()) {
                         src.getSource().sendSuccess(() -> Component.literal("§aAudios saved by " + namespace + ":"), false);
-                        for(Pair<UUID, UUID> audio : ((VoiceChatRecordingPlugin)VoiceChatRecording.recordingApi).savedAudios.get(namespace)){
+                        for(AudioId audio : ((VoiceChatRecordingPlugin)VoiceChatRecording.recordingApi).savedAudios.get(namespace)){
                             StringBuilder builder = new StringBuilder();
-                            builder.append(audio.getSecond()).append(" by ");
-                            Player p = src.getSource().getLevel().getPlayerByUUID(audio.getFirst());
-                            builder.append(p == null ? audio.getFirst() : p.getName().getString());
+                            builder.append(audio.audio()).append(" by ");
+                            Player p = src.getSource().getLevel().getPlayerByUUID(audio.player());
+                            builder.append(p == null ? audio.player() : p.getName().getString());
                             src.getSource().sendSuccess(() -> Component.literal(builder.toString()), false);
                         }
                     }
