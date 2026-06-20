@@ -1,5 +1,7 @@
 package dev.omialien.voicechatrecording.voicechat;
 
+import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
@@ -9,7 +11,6 @@ import de.maxhenkel.voicechat.api.*;
 import de.maxhenkel.voicechat.api.events.*;
 import dev.omialien.voicechatrecording.VoiceChatRecording;
 import dev.omialien.voicechatrecording.configs.RecordingCommonConfig;
-import dev.omialien.voicechatrecording.voicechat.audio.AudioCache;
 import dev.omialien.voicechatrecording.api.IRecordedAudio;
 import dev.omialien.voicechatrecording.api.IRecordedPlayer;
 import dev.omialien.voicechatrecording.api.VoiceChatRecordingApi;
@@ -37,7 +38,7 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin, VoiceChatRecor
     private ExecutorService audioLoader;
     private ExecutorService audioSaver;
     public Map<String, Set<Pair<UUID, UUID>>> savedAudios;
-    private AudioCache audioCache;
+    private Cache<Pair<UUID, UUID>, Future<IRecordedAudio>> audioCache;
 
     /**
      * @return the unique ID for this voice chat plugin
@@ -68,7 +69,6 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin, VoiceChatRecor
         if (count > 0) {
             VoiceChatRecording.LOGGER.warn("{} audios were not loaded due to shutdown", count);
         }
-        audioCache.interruptThread();
         VoiceChatRecording.LOGGER.info("Shut down audio loading");
     }
 
@@ -87,8 +87,7 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin, VoiceChatRecor
         VoicechatServerApi api = event.getVoicechat();
         VoiceChatRecording.vcApi = api;
         VoiceChatRecording.recordingApi = this;
-        if(audioCache != null) audioCache.interruptThread();
-        audioCache = new AudioCache();
+        audioCache = CacheBuilder.newBuilder().expireAfterAccess(RecordingCommonConfig.CACHE_REMOVAL_TIME.get(), TimeUnit.MILLISECONDS).build();
         savedAudios = new ConcurrentHashMap<>();
         audioLoader = Executors.newFixedThreadPool(RecordingCommonConfig.AUDIO_READER_THREAD_COUNT.get(), new ThreadFactoryBuilder().setNameFormat("AudioLoadingPool-%d").build());
         audioSaver = Executors.newFixedThreadPool(RecordingCommonConfig.AUDIO_SAVER_THREAD_COUNT.get(), new ThreadFactoryBuilder().setNameFormat("AudioSavingPool-%d").build());
@@ -170,7 +169,7 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin, VoiceChatRecor
         if (updateNamespace) {
             namespaceAudios.add(ids);
         }
-        audioCache.add(ids, audioSaver.submit(() -> audio));
+        audioCache.put(ids, audioSaver.submit(() -> audio));
         audioSaver.submit(() -> {
             writeAudio(audio, RecordedAudio.audiosPath);
             if (updateNamespace) {
@@ -251,7 +250,7 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin, VoiceChatRecor
         VoiceChatRecording.LOGGER.info("Loaded namespaces in {}ms", TimeUnit.MILLISECONDS.convert(elapsed, TimeUnit.NANOSECONDS));
     }
 
-    private IRecordedAudio readAudioFromFile(Path audioPath, Consumer<IRecordedAudio> reaction, Pair<UUID, UUID> ids) {
+    private IRecordedAudio readAudioFromFile(Path audioPath, Pair<UUID, UUID> ids) {
         short[] audio;
         try {
             byte[] byts = Files.readAllBytes(audioPath);
@@ -260,46 +259,42 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin, VoiceChatRecor
             audio = shrts;
         }  catch (FileNotFoundException e) {
             VoiceChatRecording.LOGGER.error("Tried to load non-existent audio {}", audioPath);
-            reaction.accept(null);
             return null;
         } catch (IOException e) {
             VoiceChatRecording.LOGGER.error("Error loading audio: {}", audioPath);
             VoiceChatRecording.LOGGER.error("{}", e.getMessage());
-            reaction.accept(null);
             return null;
         }
         IRecordedAudio audioObj = new RecordedAudio(audio, ids.getFirst(), ids.getSecond());
-        reaction.accept(audioObj);
         return audioObj;
     }
 
     private Future<IRecordedAudio> loadRawAudio(Pair<UUID, UUID> ids, AudioLoadedEvent.LoadType type, Consumer<IRecordedAudio> reaction, String namespace) {
         VoiceChatRecording.LOGGER.debug("Checking cache...");
-        // Check the savedAudiosCache, since if it's in there it most likely hasn't been written to disk
-        Optional<Future<IRecordedAudio>> optCached = audioCache.get(ids);
-        if(optCached.isPresent()) {
-            Future<IRecordedAudio> cached = optCached.get();
-            if(cached.state() == Future.State.SUCCESS){
-                try{
-                    IRecordedAudio audio = cached.get();
-                    reaction.accept(audio);
-                    NeoForge.EVENT_BUS.post(new AudioLoadedEvent(audio, type, namespace));
-                } catch(Exception e) {
-                    VoiceChatRecording.LOGGER.error("Error getting successfully finished audio from cache to event: {} {}", ids.getFirst(), ids.getSecond());
-                    VoiceChatRecording.LOGGER.error("{}", e.getMessage());
-                }
-            }
-            return cached;
+        Future<IRecordedAudio> cached = audioCache.getIfPresent(ids);
+        if (cached == null) {
+            VoiceChatRecording.LOGGER.debug("Not in cache, adding");
+            Path audioPath = RecordedAudio.audiosPath.resolve(RecordedAudio.getFileName(ids.getFirst(), ids.getSecond()));
+            Future<IRecordedAudio> loading = audioLoader.submit(() -> {
+                IRecordedAudio res = this.readAudioFromFile(audioPath, ids);
+                NeoForge.EVENT_BUS.post(new AudioLoadedEvent(res, type, namespace));
+                reaction.accept(res);
+                return res;
+            });
+            audioCache.put(ids, loading);
+            return loading;
         }
-        VoiceChatRecording.LOGGER.debug("Not in cache, adding");
-        Path audioPath = RecordedAudio.audiosPath.resolve(RecordedAudio.getFileName(ids.getFirst(), ids.getSecond()));
-        Future<IRecordedAudio> result = audioLoader.submit(() -> {
-            IRecordedAudio res = this.readAudioFromFile(audioPath, reaction, ids);
-            NeoForge.EVENT_BUS.post(new AudioLoadedEvent(res, type, namespace));
-            return res;
+        return audioLoader.submit(() -> {
+            try {
+                IRecordedAudio res = cached.get();
+                reaction.accept(res);
+                NeoForge.EVENT_BUS.post(new AudioLoadedEvent(res, type, namespace));
+                return res;
+            } catch (InterruptedException | ExecutionException e) {
+                VoiceChatRecording.LOGGER.error("Error getting cached audio: {}", e.getMessage());
+                return null;
+            }
         });
-        audioCache.add(ids, result);
-        return result;
     }
 
     private Future<IRecordedAudio> loadRawAudio(Pair<UUID, UUID> ids, AudioLoadedEvent.LoadType type, Consumer<IRecordedAudio> reaction){
