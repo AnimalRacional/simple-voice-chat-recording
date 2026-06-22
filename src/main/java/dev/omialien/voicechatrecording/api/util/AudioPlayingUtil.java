@@ -7,7 +7,6 @@ import de.maxhenkel.voicechat.api.audiochannel.LocationalAudioChannel;
 import dev.omialien.voicechatrecording.VoiceChatRecording;
 import dev.omialien.voicechatrecording.api.IRecordedAudio;
 import dev.omialien.voicechatrecording.api.AudioEffect;
-import dev.omialien.voicechatrecording.voicechat.audio.AudioPlayer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.phys.Vec3;
@@ -54,7 +53,8 @@ public class AudioPlayingUtil {
         play(audio.applyEffects(effects), chan, api);
     }
 
-    private static void play(short[] audio, AudioChannel chan, VoicechatServerApi api){
-        new AudioPlayer(audio, api, chan).start();
+
+    private static void play(short[] audio, AudioChannel channel, VoicechatServerApi api){
+        api.createAudioPlayer(channel, api.createEncoder(), audio).startPlaying();
     }
 }
