@@ -159,9 +159,4 @@ public class RecordedAudio implements IRecordedAudio {
     public static String getFileName(UUID playerUuid, UUID audioId) {
         return String.format("%s+%s.pcm", playerUuid.toString(), audioId.toString());
     }
-
-    // Makes a RecordedAudio that can be used to find a recorded audio with the specified ID
-    public static RecordedAudio makeIdentificationAudio(UUID player, UUID audioId) {
-        return new RecordedAudio(null, player, audioId);
-    }
 }

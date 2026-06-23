@@ -35,7 +35,7 @@ public class CommonEventBus {
             try {
                 Files.createDirectory(RecordedAudio.audiosPath);
             } catch (IOException e) {
-                VoiceChatRecording.LOGGER.error("Error creating audios directory: " + e.getMessage());
+                VoiceChatRecording.LOGGER.error("Error creating audios directory: {}", e.getMessage());
             }
         }
     }

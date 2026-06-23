@@ -78,7 +78,7 @@ public interface IRecordedAudio {
     int getActiveSamples();
 
     /**
-     * Gets the root mean square of the audio, which can be used to represent its loudness
+     * Gets the root-mean-square of the audio, which can be used to represent its loudness
      * @return the RMS of the audio
      */
     double getRms();
