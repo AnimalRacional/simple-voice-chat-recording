@@ -76,6 +76,7 @@ public class CommonEventBus {
     @SubscribeEvent
     public static void tickEvent(ServerTickEvent.Post event){
         VoiceChatRecording.TASKS.tick();
+        ((VoiceChatRecordingPlugin)VoiceChatRecording.recordingApi).tick();
     }
 
     @SubscribeEvent

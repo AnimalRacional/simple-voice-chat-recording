@@ -12,5 +12,7 @@ public class RecordingCommonConfig {
             .define("saveThreadCount", 4);
     public static final ModConfigSpec.ConfigValue<Integer> CACHE_REMOVAL_TIME = BUILDER
             .define("cacheRemovalTime", (5 * 60 * 1000));
+    public static final ModConfigSpec.ConfigValue<Integer> NAMESPACE_SAVE_TICKS = BUILDER
+            .define("namespaceSaveTicks", (20*20));
     public static final ModConfigSpec SPEC = BUILDER.build();
 }
