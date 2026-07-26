@@ -2,7 +2,6 @@ package dev.omialien.voicechatrecording.events;
 
 import dev.omialien.voicechatrecording.VoiceChatRecording;
 import dev.omialien.voicechatrecording.commands.*;
-import dev.omialien.voicechatrecording.taskscheduler.TaskScheduler;
 import dev.omialien.voicechatrecording.voicechat.RecordedAudio;
 import dev.omialien.voicechatrecording.voicechat.VoiceChatRecordingPlugin;
 import dev.omialien.voicechatrecording.api.IRecordedAudio;
@@ -74,10 +73,6 @@ public class CommonEventBus {
     public static void tickEvent(TickEvent.ServerTickEvent event){
         if ( event.phase == TickEvent.Phase.END ) {
             VoiceChatRecording.TASKS.tick();
-            TaskScheduler scheduler = ((VoiceChatRecordingPlugin)(VoiceChatRecording.recordingApi)).audioSavingTask;
-            if(scheduler != null) {
-                scheduler.tick();
-            }
         }
     }
 
