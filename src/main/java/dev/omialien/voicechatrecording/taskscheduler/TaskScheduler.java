@@ -1,68 +1,29 @@
 package dev.omialien.voicechatrecording.taskscheduler;
 
-import dev.omialien.voicechatrecording.VoiceChatRecording;
+import java.util.Comparator;
+import java.util.PriorityQueue;
 
 public class TaskScheduler {
-    private Task nextTask;
     private long time;
-
-    public TaskScheduler(){
-        nextTask = null;
-        time = 0;
+    private final PriorityQueue<Task> tasks;
+    public TaskScheduler() {
+        this.time = 0;
+        this.tasks = new PriorityQueue<>(Comparator.comparingLong(Task::time));
     }
 
-    public void tick(){
-        if(nextTask != null){
-            time++;
-            Task cur = nextTask;
-            while(cur != null && cur.getTime() <= time){
-                cur.run();
-                cur = cur.getNext();
-            }
-            nextTask = cur;
+    synchronized public void tick() {
+        this.time++;
+        while (!tasks.isEmpty() && tasks.peek().time() <= this.time) {
+            tasks.poll().task().run();
         }
     }
 
-    public long getTime(){ return time; }
-
-    public void schedule(Runnable method, long ticks){
-        long timeToRun = time + ticks;
-        Task toInsert = new Task(timeToRun, method);
-        Task last = null;
-        Task cur = nextTask;
-        if(cur != null){
-            while(cur.getTime() <= timeToRun){
-                Task next = cur.getNext();
-                if(next == null){
-                    cur.setNext(toInsert);
-                    return;
-                } else {
-                    last = cur;
-                    cur = cur.getNext();
-                }
-            }
-            if(last == null){
-                nextTask = toInsert;
-                nextTask.setNext(cur);
-            } else {
-                toInsert.setNext(cur);
-                last.setNext(toInsert);
-            }
-        } else {
-            nextTask = toInsert;
-        }
+    synchronized public void schedule(Runnable method, long after) {
+        this.scheduleAt(method, time + after);
     }
 
-    public void scheduleAt(Runnable method, long when){
-        schedule(method, when - time);
-    }
-
-    public void debug(){
-        Task cur = nextTask;
-        while(cur != null){
-            VoiceChatRecording.LOGGER.debug("Executed at: {}", cur.getTime());
-            cur.run();
-            cur = cur.getNext();
-        }
+    synchronized public void scheduleAt(Runnable method, long when) {
+        Task task = new Task(when, method);
+        tasks.add(task);
     }
 }
