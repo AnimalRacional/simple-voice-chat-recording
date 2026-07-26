@@ -6,14 +6,12 @@ import com.mojang.brigadier.arguments.FloatArgumentType;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
-import com.mojang.datafixers.util.Pair;
+import dev.omialien.voicechatrecording.AudioId;
 import dev.omialien.voicechatrecording.VoiceChatRecording;
 import dev.omialien.voicechatrecording.api.AudioEffect;
-import dev.omialien.voicechatrecording.api.IRecordedAudio;
 import dev.omialien.voicechatrecording.api.util.AudioPlayingUtil;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
-import net.minecraft.commands.SharedSuggestionProvider;
 import net.minecraft.commands.arguments.EntityArgument;
 import net.minecraft.commands.arguments.UuidArgument;
 import net.minecraft.network.chat.Component;
@@ -28,7 +26,6 @@ import net.minecraft.world.phys.Vec3;
 import javax.annotation.Nullable;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.UUID;
 
 public class NearestEntityPlayVoiceCommand {
     public static final int PERMISSION_LEVEL = 2;
@@ -63,7 +60,7 @@ public class NearestEntityPlayVoiceCommand {
                         .executes((ctx) ->{
                             VoiceChatRecording.LOGGER.debug("id");
                             return runCommand(ctx, null,
-                                    new Pair<>(UuidArgument.getUuid(ctx, "player"),
+                                    AudioId.of(UuidArgument.getUuid(ctx, "player"),
                                             UuidArgument.getUuid(ctx, "audio")), null);
                         })
                         .then(Commands.argument("entity", EntityArgument.entities())
@@ -71,14 +68,14 @@ public class NearestEntityPlayVoiceCommand {
                                     VoiceChatRecording.LOGGER.debug("ent id");
                                     return runCommand(
                                         ctx, EntityArgument.getEntities(ctx, "entity"),
-                                        new Pair<>(UuidArgument.getUuid(ctx, "player"),
+                                        AudioId.of(UuidArgument.getUuid(ctx, "player"),
                                                 UuidArgument.getUuid(ctx, "audio")), null);
                                 })
                                 .then(PITCH_ARG((ctx) -> {
                                     VoiceChatRecording.LOGGER.debug("ent id pitch");
                                     return runCommand(
                                             ctx, EntityArgument.getEntities(ctx, "entity"),
-                                            new Pair<>(
+                                            AudioId.of(
                                                     UuidArgument.getUuid(ctx, "player"),
                                                     UuidArgument.getUuid(ctx, "audio")
                                             ),
@@ -91,7 +88,7 @@ public class NearestEntityPlayVoiceCommand {
                                     int repeats = IntegerArgumentType.getInteger(ctx, "repeats");
                                     return runCommand(
                                             ctx, EntityArgument.getEntities(ctx, "entity"),
-                                            new Pair<>(
+                                            AudioId.of(
                                                     UuidArgument.getUuid(ctx, "player"),
                                                     UuidArgument.getUuid(ctx, "audio")
                                             ),
@@ -102,7 +99,7 @@ public class NearestEntityPlayVoiceCommand {
                                     VoiceChatRecording.LOGGER.debug("ent id robot");
                                     return runCommand(
                                             ctx, EntityArgument.getEntities(ctx, "entity"),
-                                            new Pair<>(
+                                            AudioId.of(
                                                     UuidArgument.getUuid(ctx, "player"),
                                                     UuidArgument.getUuid(ctx, "audio")
                                             ),
@@ -113,7 +110,7 @@ public class NearestEntityPlayVoiceCommand {
                                     VoiceChatRecording.LOGGER.debug("ent id random");
                                     return runCommand(
                                             ctx, EntityArgument.getEntities(ctx, "entity"),
-                                            new Pair<>(
+                                            new AudioId(
                                                     UuidArgument.getUuid(ctx, "player"),
                                                     UuidArgument.getUuid(ctx, "audio")
                                             ),
@@ -132,10 +129,10 @@ public class NearestEntityPlayVoiceCommand {
     }
 
     private static void playAudio(CommandContext<CommandSourceStack> ctx,
-                                  Entity entity, Pair<UUID, UUID> id,
+                                  Entity entity, AudioId id,
                                   AudioEffect effects){
         VoiceChatRecording.LOGGER.debug("Entity: " + entity.getName());
-        CommandUtil.loadAudio(id.getFirst(), id.getSecond(), ctx, (audio) -> {
+        CommandUtil.loadAudio(id.player(), id.audio(), (audio) -> {
             if(audio != null){
                 Player player = entity.level().getPlayerByUUID(audio.getPlayerUUID());
                 String playerName = player == null ? audio.getPlayerUUID().toString() : player.getName().getString();
@@ -150,7 +147,7 @@ public class NearestEntityPlayVoiceCommand {
 
     public static int runCommand(CommandContext<CommandSourceStack> ctx,
                                  @Nullable Collection<? extends Entity> targets,
-                                 Pair<UUID, UUID> id, AudioEffect effects){
+                                 AudioId id, AudioEffect effects){
         try{
             Collection<Entity> entities = targets == null ? null : targets.stream().map((e) -> (Entity)e).toList();
             if(entities == null){

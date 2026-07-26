@@ -24,7 +24,7 @@ public class AudioInfoCommand {
     private static int executeCommand(CommandContext<CommandSourceStack> src) {
         UUID player = UuidArgument.getUuid(src, "player");
         UUID id = UuidArgument.getUuid(src, "audio");
-        CommandUtil.loadAudio(player, id, src, (IRecordedAudio res) -> {
+        CommandUtil.loadAudio(player, id, (IRecordedAudio res) -> {
             if (res != null) {
                 String info = ((RecordedAudio)res).getAudioInfo();
                 src.getSource().sendSuccess(() -> Component.literal(info), false);

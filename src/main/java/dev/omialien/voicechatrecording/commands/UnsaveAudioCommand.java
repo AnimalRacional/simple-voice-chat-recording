@@ -19,12 +19,12 @@ public class UnsaveAudioCommand {
                         Commands.argument("player",
                                         UuidArgument.uuid()).suggests((src, suggestionsBuilder) ->
                                         SharedSuggestionProvider.suggest(
-                                                CommandUtil.getSavedAudios(VoiceChatRecording.MOD_ID).map(r -> r.getFirst().toString()), suggestionsBuilder))
+                                                CommandUtil.getSavedAudios(VoiceChatRecording.MOD_ID).map(r -> r.player().toString()), suggestionsBuilder))
                                 .then(
                                         Commands.argument("audio",
                                                         UuidArgument.uuid()).suggests((src, suggestionsBuilder) ->
                                                         SharedSuggestionProvider.suggest(
-                                                                CommandUtil.getSavedAudios(VoiceChatRecording.MOD_ID).map(r -> r.getSecond().toString()), suggestionsBuilder))
+                                                                CommandUtil.getSavedAudios(VoiceChatRecording.MOD_ID).map(r -> r.audio().toString()), suggestionsBuilder))
                                                 .executes(UnsaveAudioCommand::runCommand))));
     }
 

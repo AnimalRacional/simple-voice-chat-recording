@@ -1,6 +1,5 @@
 package dev.omialien.voicechatrecording.voicechat;
 
-import com.mojang.datafixers.util.Pair;
 import dev.omialien.voicechatrecording.VoiceChatRecording;
 import dev.omialien.voicechatrecording.configs.RecordingCommonConfig;
 import dev.omialien.voicechatrecording.api.AudioEffect;
@@ -10,7 +9,6 @@ import javax.annotation.Nullable;
 import java.nio.file.Path;
 import java.util.Objects;
 import java.util.UUID;
-import java.util.regex.Pattern;
 
 public class RecordedAudio implements IRecordedAudio {
     public final int SAMPLE_RATE = 48000;
@@ -160,33 +158,5 @@ public class RecordedAudio implements IRecordedAudio {
 
     public static String getFileName(UUID playerUuid, UUID audioId) {
         return String.format("%s+%s.pcm", playerUuid.toString(), audioId.toString());
-    }
-
-    @Nullable
-    public static Pair<UUID, UUID> getIdFromFile(Path path) {
-        String name = path.getFileName().toString();
-        if(!name.endsWith(".pcm")) { return null; }
-        if(name.length() != 77) return null;
-        String[] split = name.split(Pattern.quote("+"));
-        UUID player;
-        try{
-            player = UUID.fromString(split[0]);
-            VoiceChatRecording.LOGGER.debug("player id: {}", player);
-        } catch(IllegalArgumentException e){
-            return null;
-        }
-        UUID audio;
-        try {
-            audio = UUID.fromString(split[1].split(Pattern.quote(".pcm"))[0]);
-            VoiceChatRecording.LOGGER.debug("audio: {}", audio);
-        } catch(IllegalArgumentException e){
-            return null;
-        }
-        return new Pair<>(player, audio);
-    }
-
-    // Makes a RecordedAudio that can be used to find a recorded audio with the specified ID
-    public static RecordedAudio makeIdentificationAudio(UUID player, UUID audioId) {
-        return new RecordedAudio(null, player, audioId);
     }
 }

@@ -5,9 +5,9 @@ import com.google.common.cache.CacheBuilder;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 import com.google.gson.stream.JsonReader;
-import com.mojang.datafixers.util.Pair;
 import de.maxhenkel.voicechat.api.*;
 import de.maxhenkel.voicechat.api.events.*;
+import dev.omialien.voicechatrecording.AudioId;
 import dev.omialien.voicechatrecording.VoiceChatRecording;
 import dev.omialien.voicechatrecording.configs.RecordingCommonConfig;
 import dev.omialien.voicechatrecording.api.IRecordedAudio;
@@ -37,8 +37,8 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin, VoiceChatRecor
     private Map<UUID, Boolean> privacyMode;
     private ExecutorService audioSaver;
     private ExecutorService audioLoader;
-    public Map<String, Set<Pair<UUID, UUID>>> savedAudios;
-    private Cache<Pair<UUID, UUID>, Future<IRecordedAudio>> audioCache;
+    public Map<String, Set<AudioId>> savedAudios;
+    private Cache<AudioId, Future<IRecordedAudio>> audioCache;
 
     /**
      * @return the unique ID for this voice chat plugin
@@ -148,7 +148,7 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin, VoiceChatRecor
     public void writeNamespaceFile(String namespace, Path basePath) {
         long start = System.nanoTime();
         Path path = basePath.resolve(namespace + ".json");
-        Set<Pair<UUID, UUID>> audios = savedAudios.get(namespace);
+        Set<AudioId> audios = savedAudios.get(namespace);
         try {
             PrintWriter writer = new PrintWriter(path.toFile());
             writer.println(gson.toJson(audios));
@@ -165,8 +165,8 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin, VoiceChatRecor
     public void saveAudio(String namespace, RecordedAudio audio){
         VoiceChatRecording.LOGGER.debug("PLUGIN saving audio {} {}", namespace, audio.getId());
         savedAudios.computeIfAbsent(namespace, (k) -> ConcurrentHashMap.newKeySet());
-        Pair<UUID, UUID> ids = new Pair<>(audio.getPlayerUUID(), audio.getId());
-        Set<Pair<UUID, UUID>> namespaceAudios = savedAudios.get(namespace);
+        AudioId ids = new AudioId(audio.getPlayerUUID(), audio.getId());
+        Set<AudioId> namespaceAudios = savedAudios.get(namespace);
         boolean updateNamespace = !namespaceAudios.contains(ids);
         if (updateNamespace) {
             namespaceAudios.add(ids);
@@ -186,7 +186,7 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin, VoiceChatRecor
         //  although it'll be deleted right afterwards if no other namespace saves it
         //  We can't just remove it from there since it's possible some other namespace also saved it, so is it worth it dealing with this edge case?
         if(savedAudios.containsKey(namespace)) {
-            Pair<UUID, UUID> id = new Pair<>(playerUUID, audioUUID);
+            AudioId id = new AudioId(playerUUID, audioUUID);
             savedAudios.get(namespace).remove(id);
             writeNamespaceFile(namespace, RecordedAudio.audiosPath);
             boolean stillSaved = savedAudios.entrySet().stream().anyMatch((p) -> p.getValue().contains(id));
@@ -241,12 +241,12 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin, VoiceChatRecor
                     VoiceChatRecording.LOGGER.debug("Checking potential namespace file {}", filename);
                     String namespace = filename.substring(0, filename.lastIndexOf('.'));
                     JsonReader reader = new JsonReader(new FileReader(curNamespace.toFile()));
-                    Set<Pair<UUID, UUID>> audioIds = gson.fromJson(reader, new TypeToken<Set<Pair<UUID, UUID>>>(){}.getType());
+                    Set<AudioId> audioIds = gson.fromJson(reader, new TypeToken<Set<AudioId>>(){}.getType());
                     VoiceChatRecording.LOGGER.info("Loading namespace {}: {} audios", namespace, audioIds.size());
                     if(!savedAudios.containsKey(namespace)) { savedAudios.put(namespace, ConcurrentHashMap.newKeySet()); }
-                    for(Pair<UUID, UUID> id : audioIds){
+                    for(AudioId id : audioIds){
                         savedAudios.get(namespace).add(id);
-                        VoiceChatRecording.LOGGER.debug("{}: {} {}", namespace, id.getFirst(), id.getSecond());
+                        VoiceChatRecording.LOGGER.debug("{}: {} {}", namespace, id.player(), id.second());
                     }
                 }
             }
@@ -255,7 +255,7 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin, VoiceChatRecor
         VoiceChatRecording.LOGGER.info("Loaded namespaces in {}ms", TimeUnit.MILLISECONDS.convert(elapsed, TimeUnit.NANOSECONDS));
     }
 
-    private IRecordedAudio readAudioFromFile(Path audioPath, Pair<UUID, UUID> ids) {
+    private IRecordedAudio readAudioFromFile(Path audioPath, AudioId ids) {
         short[] audio;
         try {
             byte[] byts = Files.readAllBytes(audioPath);
@@ -270,16 +270,16 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin, VoiceChatRecor
             VoiceChatRecording.LOGGER.error("{}", e.getMessage());
             return null;
         }
-        IRecordedAudio audioObj = new RecordedAudio(audio, ids.getFirst(), ids.getSecond());
+        IRecordedAudio audioObj = new RecordedAudio(audio, ids.first(), ids.second());
         return audioObj;
     }
 
     @Nullable
-    private Future<IRecordedAudio> loadRawAudio(Pair<UUID, UUID> ids, AudioLoadedEvent.LoadType type, Consumer<IRecordedAudio> reaction, String namespace) {
+    private Future<IRecordedAudio> loadRawAudio(AudioId ids, AudioLoadedEvent.LoadType type, Consumer<IRecordedAudio> reaction, String namespace) {
         VoiceChatRecording.LOGGER.debug("Checking cache...");
         try {
             return audioCache.get(ids, () -> {
-                Path audioPath = RecordedAudio.audiosPath.resolve(RecordedAudio.getFileName(ids.getFirst(), ids.getSecond()));
+                Path audioPath = RecordedAudio.audiosPath.resolve(RecordedAudio.getFileName(ids.player(), ids.audio()));
                 return audioLoader.submit(() -> {
                     IRecordedAudio res = this.readAudioFromFile(audioPath, ids);
                     MinecraftForge.EVENT_BUS.post(new AudioLoadedEvent(res, type, namespace));
@@ -293,15 +293,15 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin, VoiceChatRecor
         }
     }
 
-    private Future<IRecordedAudio> loadRawAudio(Pair<UUID, UUID> ids, AudioLoadedEvent.LoadType type, Consumer<IRecordedAudio> reaction){
+    private Future<IRecordedAudio> loadRawAudio(AudioId ids, AudioLoadedEvent.LoadType type, Consumer<IRecordedAudio> reaction){
         return loadRawAudio(ids, type, reaction, "");
     }
 
-    private Future<IRecordedAudio> loadRawAudio(Pair<UUID, UUID> ids, AudioLoadedEvent.LoadType type, String namespace){
+    private Future<IRecordedAudio> loadRawAudio(AudioId ids, AudioLoadedEvent.LoadType type, String namespace){
         return loadRawAudio(ids, type, (audio) -> {}, namespace);
     }
 
-    private Future<IRecordedAudio> loadRawAudio(Pair<UUID, UUID> ids, AudioLoadedEvent.LoadType type) {
+    private Future<IRecordedAudio> loadRawAudio(AudioId ids, AudioLoadedEvent.LoadType type) {
         return loadRawAudio(ids, type, "");
     }
 
@@ -318,9 +318,9 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin, VoiceChatRecor
             VoiceChatRecording.LOGGER.warn("Tried to load from non-existent namespace {}", namespace);
             return Collections.emptySet();
         }
-        Set<Pair<UUID, UUID>> toLoad = savedAudios.getOrDefault(namespace, Collections.emptySet());
+        Set<AudioId> toLoad = savedAudios.getOrDefault(namespace, Collections.emptySet());
         Set<Future<IRecordedAudio>> loadedAudios = new HashSet<>(toLoad.size());
-        for(Pair<UUID, UUID> cur : toLoad) {
+        for(AudioId cur : toLoad) {
             loadedAudios.add(loadRawAudio(cur, AudioLoadedEvent.LoadType.NAMESPACE, reaction, namespace));
         }
         return loadedAudios;
@@ -345,7 +345,7 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin, VoiceChatRecor
      * @return a set of all the identifiers of the audios saved to the given namespace
      */
     @Override
-    public Set<Pair<UUID, UUID>> getNamespaceAudios(String namespace) {
+    public Set<AudioId> getNamespaceAudios(String namespace) {
         return Collections.unmodifiableSet(savedAudios.getOrDefault(namespace, Collections.emptySet()));
     }
 
@@ -358,7 +358,7 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin, VoiceChatRecor
      */
     @Override
     public Future<IRecordedAudio> loadAudio(UUID playerUuid, UUID audioId, Consumer<IRecordedAudio> reaction) {
-        return loadRawAudio(new Pair<>(playerUuid, audioId), AudioLoadedEvent.LoadType.SINGLE, reaction);
+        return loadRawAudio(AudioId.of(playerUuid, audioId), AudioLoadedEvent.LoadType.SINGLE, reaction);
     }
 
     /**
