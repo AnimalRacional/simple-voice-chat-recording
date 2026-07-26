@@ -44,8 +44,8 @@ public class AudioEffect {
         return this;
     }
 
-    public static AudioEffect robot(float lfoFreqhz){
-        return new AudioEffect().makeRobot(lfoFreqhz);
+    public static AudioEffect robot(float lfoFreqHz){
+        return new AudioEffect().makeRobot(lfoFreqHz);
     }
 
     public AudioEffect makeRobot(float lfoFreqHz) {

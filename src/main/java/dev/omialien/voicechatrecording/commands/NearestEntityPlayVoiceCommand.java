@@ -131,7 +131,7 @@ public class NearestEntityPlayVoiceCommand {
     private static void playAudio(CommandContext<CommandSourceStack> ctx,
                                   Entity entity, AudioId id,
                                   AudioEffect effects){
-        VoiceChatRecording.LOGGER.debug("Entity: " + entity.getName());
+        VoiceChatRecording.LOGGER.debug("Entity: {}", entity.getName());
         CommandUtil.loadAudio(id.player(), id.audio(), (audio) -> {
             if(audio != null){
                 Player player = entity.level().getPlayerByUUID(audio.getPlayerUUID());
