@@ -62,6 +62,7 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin, VoiceChatRecor
         } catch (InterruptedException e) {
             VoiceChatRecording.LOGGER.error("Audio saving was unexpectedly interrupted: {}", e.getMessage());
         }
+        saveNamespaceFiles();
         long elapsed = System.nanoTime() - start;
         VoiceChatRecording.LOGGER.info("Shut down audio saving in {}ms", TimeUnit.MILLISECONDS.convert(elapsed, TimeUnit.NANOSECONDS));
     }
