@@ -18,6 +18,6 @@ public interface VoiceChatRecordingApi {
     Set<Future<IRecordedAudio>> loadPlayerAudios(UUID playerUuid);
     IRecordedPlayer getRecordedPlayer(UUID uuid);
     boolean getPrivacy(UUID uuid);
-    void unsaveAudio(String namespace, IRecordedAudio audio);
+    void unsaveAudio(String namespace, UUID playerId, UUID audioId);
 
 }

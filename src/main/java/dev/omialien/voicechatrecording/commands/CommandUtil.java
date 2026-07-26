@@ -41,6 +41,10 @@ public class CommandUtil {
         return VoiceChatRecording.storedAudios.stream();
     }
 
+    public static Stream<Pair<UUID, UUID>> getSavedAudios(String namespace) {
+        return VoiceChatRecording.recordingApi.getNamespaceAudios(namespace).stream();
+    }
+
     public static void sendInterruptFailure(CommandSourceStack src) {
         src.sendFailure(Component.literal("Audio loading was interrupted!"));
     }
