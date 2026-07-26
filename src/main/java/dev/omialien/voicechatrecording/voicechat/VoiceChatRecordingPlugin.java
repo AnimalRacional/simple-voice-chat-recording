@@ -24,6 +24,7 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.channels.FileChannel;
 import java.nio.file.DirectoryStream;
+import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
@@ -39,6 +40,8 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin, VoiceChatRecor
     private ExecutorService audioLoader;
     public Map<String, Set<AudioId>> savedAudios;
     private Cache<AudioId, Future<IRecordedAudio>> audioCache;
+    private final Set<String> dirtyNamespaces = Collections.synchronizedSet(new HashSet<>());
+    private int ticksToSaveNamespaces;
 
     /**
      * @return the unique ID for this voice chat plugin
@@ -93,6 +96,8 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin, VoiceChatRecor
         audioSaver = Executors.newFixedThreadPool(RecordingCommonConfig.AUDIO_SAVER_THREAD_COUNT.get());
         recordedPlayers = new ConcurrentHashMap<>();
         privacyMode = new ConcurrentHashMap<>();
+        dirtyNamespaces.clear();
+        ticksToSaveNamespaces = RecordingCommonConfig.NAMESPACE_SAVE_TICKS.get();
 
         try {
             loadNamespaceFiles();
@@ -115,38 +120,47 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin, VoiceChatRecor
 
     private void writeAudio(RecordedAudio audio, Path basePath) {
         Path path = basePath.resolve(audio.fileName());
-        if (!Files.exists(path)) {
-            try {
-                long start = System.nanoTime();
-                try (FileOutputStream fos = new FileOutputStream(path.toFile())) {
-                    FileChannel out = fos.getChannel();
-                    short[] audioData = audio.getAudio();
-                    ByteBuffer buffer = ByteBuffer.allocate(audioData.length * 2);
-                    buffer.order(ByteOrder.BIG_ENDIAN).asShortBuffer().put(audioData);
-                    long written = 0;
-                    int count = 0;
-                    while(written < audioData.length * 2L) {
-                        written += out.write(buffer);
-                        count += 1;
-                    }
-                    VoiceChatRecording.LOGGER.debug("Took {} writes to write to file", count);
+        try {
+            Path result = Files.createFile(path);
+            long start = System.nanoTime();
+            try (FileOutputStream fos = new FileOutputStream(result.toFile())) {
+                FileChannel out = fos.getChannel();
+                short[] audioData = audio.getAudio();
+                ByteBuffer buffer = ByteBuffer.allocate(audioData.length * 2);
+                buffer.order(ByteOrder.BIG_ENDIAN).asShortBuffer().put(audioData);
+                long written = 0;
+                int count = 0;
+                while(written < audioData.length * 2L) {
+                    written += out.write(buffer);
+                    count += 1;
                 }
-                long elapsed = System.nanoTime() - start;
-                VoiceChatRecording.LOGGER.debug("Finished writing {} to file in {}ms", path, TimeUnit.MILLISECONDS.convert(elapsed, TimeUnit.NANOSECONDS));
-            } catch (FileNotFoundException e) {
-                VoiceChatRecording.LOGGER.error("Couldn't find newly created file? {}", path);
-                VoiceChatRecording.LOGGER.error("{}", e.getMessage());
-            } catch (IOException e) {
-                VoiceChatRecording.LOGGER.error("Error writing file! {}", path);
-                VoiceChatRecording.LOGGER.error("{}", e.getMessage());
+                VoiceChatRecording.LOGGER.debug("Took {} writes to write to file", count);
             }
-        } else {
-            VoiceChatRecording.LOGGER.debug("Audio {} already exists", path);
+            long elapsed = System.nanoTime() - start;
+            VoiceChatRecording.LOGGER.debug("Finished writing {} to file in {}ms", path, TimeUnit.MILLISECONDS.convert(elapsed, TimeUnit.NANOSECONDS));
+        } catch (FileAlreadyExistsException e){
+            VoiceChatRecording.LOGGER.debug("Saved already-existing audio {} {}", audio.getPlayerUUID(), audio.getId());
+        } catch (IOException e) {
+            throw new RuntimeException(e);
         }
     }
 
-    public void writeNamespaceFile(String namespace, Path basePath) {
+    private void saveNamespaceFiles() {
+        Path basePath = RecordedAudio.audiosPath;
         long start = System.nanoTime();
+        synchronized (dirtyNamespaces) {
+            for (String namespace : dirtyNamespaces) {
+                audioSaver.submit(() -> {
+                    writeNamespaceFile(namespace, basePath);
+                });
+            }
+            dirtyNamespaces.clear();
+        }
+        long elapsed = System.nanoTime() - start;
+        VoiceChatRecording.LOGGER.debug("Finished saving namespace files in {}ms", TimeUnit.MILLISECONDS.convert(elapsed, TimeUnit.NANOSECONDS));
+    }
+
+    public void writeNamespaceFile(String namespace, Path basePath) {
         Path path = basePath.resolve(namespace + ".json");
         Set<AudioId> audios = savedAudios.get(namespace);
         try {
@@ -158,8 +172,6 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin, VoiceChatRecor
             VoiceChatRecording.LOGGER.error("Couldn't save json file for namespace {}!", namespace);
             VoiceChatRecording.LOGGER.error("{}", e.getMessage());
         }
-        long elapsed = System.nanoTime() - start;
-        VoiceChatRecording.LOGGER.debug("Wrote namespace file for {} in {}ms", namespace, TimeUnit.MILLISECONDS.convert(elapsed, TimeUnit.NANOSECONDS));
     }
 
     public void saveAudio(String namespace, RecordedAudio audio){
@@ -169,14 +181,12 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin, VoiceChatRecor
         Set<AudioId> namespaceAudios = savedAudios.get(namespace);
         boolean updateNamespace = !namespaceAudios.contains(ids);
         if (updateNamespace) {
+            dirtyNamespaces.add(namespace);
             namespaceAudios.add(ids);
         }
         audioCache.put(ids, audioSaver.submit(() -> audio));
         audioSaver.submit(() -> {
             writeAudio(audio, RecordedAudio.audiosPath);
-            if (updateNamespace) {
-                writeNamespaceFile(namespace, RecordedAudio.audiosPath);
-            }
         });
     }
 
@@ -188,8 +198,8 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin, VoiceChatRecor
         if(savedAudios.containsKey(namespace)) {
             AudioId id = new AudioId(playerUUID, audioUUID);
             savedAudios.get(namespace).remove(id);
-            writeNamespaceFile(namespace, RecordedAudio.audiosPath);
-            boolean stillSaved = savedAudios.entrySet().stream().anyMatch((p) -> p.getValue().contains(id));
+            dirtyNamespaces.add(namespace);
+            boolean stillSaved = savedAudios.values().stream().anyMatch((p) -> p.contains(id));
             if(!stillSaved) {
                 try {
                     Files.delete(RecordedAudio.audiosPath.resolve(RecordedAudio.getFileName(playerUUID, audioUUID)));
@@ -462,5 +472,12 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin, VoiceChatRecor
             player.setSilent(true);
         }
         VoiceChatRecording.TASKS.schedule(this::checkForSilence, 25);
+    }
+
+    public void tick() {
+        if (--ticksToSaveNamespaces <= 0) {
+            ticksToSaveNamespaces = RecordingCommonConfig.NAMESPACE_SAVE_TICKS.get();
+            saveNamespaceFiles();
+        }
     }
 }

@@ -73,6 +73,7 @@ public class CommonEventBus {
     public static void tickEvent(TickEvent.ServerTickEvent event){
         if ( event.phase == TickEvent.Phase.END ) {
             VoiceChatRecording.TASKS.tick();
+            ((VoiceChatRecordingPlugin)VoiceChatRecording.recordingApi).tick();
         }
     }
 

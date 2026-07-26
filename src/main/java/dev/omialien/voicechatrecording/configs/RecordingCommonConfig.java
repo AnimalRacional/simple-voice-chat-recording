@@ -9,6 +9,7 @@ public class RecordingCommonConfig {
     public static final ForgeConfigSpec.ConfigValue<Integer> AUDIO_READER_THREAD_COUNT;
     public static final ForgeConfigSpec.ConfigValue<Integer> AUDIO_SAVER_THREAD_COUNT;
     public static final ForgeConfigSpec.ConfigValue<Integer> CACHE_REMOVAL_TIME;
+    public static final ForgeConfigSpec.ConfigValue<Integer> NAMESPACE_SAVE_TICKS;
 
     static {
         BUILDER.push("Server Configs for Voice Chat Recording Mod");
@@ -20,6 +21,8 @@ public class RecordingCommonConfig {
                 .define("Saving Thread Count", 4);
         CACHE_REMOVAL_TIME = BUILDER.comment("How long, in milliseconds, an audio loaded from disk stays in cache. Higher means more memory usage, but faster when loading the same audio repeatedly")
                 .define("Cache Removal Time", 5 * 60 * 1000);
+        NAMESPACE_SAVE_TICKS = BUILDER.comment("Amount of ticks between saving namespace files")
+                .define("Namespace Save Ticks", (20*20));
         BUILDER.pop();
         SPEC = BUILDER.build();
     }
