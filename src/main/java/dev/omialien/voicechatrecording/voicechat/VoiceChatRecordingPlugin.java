@@ -62,6 +62,9 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin, VoiceChatRecor
         } catch (InterruptedException e) {
             VoiceChatRecording.LOGGER.error("Audio saving was unexpectedly interrupted: {}", e.getMessage());
         }
+        if (!dirtyNamespaces.isEmpty()) {
+            saveNamespaceFiles();
+        }
         long elapsed = System.nanoTime() - start;
         VoiceChatRecording.LOGGER.info("Shut down audio saving in {}ms", TimeUnit.MILLISECONDS.convert(elapsed, TimeUnit.NANOSECONDS));
     }
@@ -146,13 +149,14 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin, VoiceChatRecor
     }
 
     private void saveNamespaceFiles() {
+        if (dirtyNamespaces.isEmpty()) {
+            return;
+        }
         Path basePath = RecordedAudio.audiosPath;
         long start = System.nanoTime();
         synchronized (dirtyNamespaces) {
             for (String namespace : dirtyNamespaces) {
-                audioSaver.submit(() -> {
-                    writeNamespaceFile(namespace, basePath);
-                });
+                audioSaver.submit(() -> writeNamespaceFile(namespace, basePath));
             }
             dirtyNamespaces.clear();
         }
@@ -181,13 +185,12 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin, VoiceChatRecor
         Set<AudioId> namespaceAudios = savedAudios.get(namespace);
         boolean updateNamespace = !namespaceAudios.contains(ids);
         if (updateNamespace) {
+            ticksToSaveNamespaces = RecordingCommonConfig.NAMESPACE_SAVE_TICKS.get();
             dirtyNamespaces.add(namespace);
             namespaceAudios.add(ids);
         }
         audioCache.put(ids, audioSaver.submit(() -> audio));
-        audioSaver.submit(() -> {
-            writeAudio(audio, RecordedAudio.audiosPath);
-        });
+        audioSaver.submit(() -> writeAudio(audio, RecordedAudio.audiosPath));
     }
 
     @Override
@@ -198,6 +201,7 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin, VoiceChatRecor
         if(savedAudios.containsKey(namespace)) {
             AudioId id = new AudioId(playerUUID, audioUUID);
             savedAudios.get(namespace).remove(id);
+            ticksToSaveNamespaces = RecordingCommonConfig.NAMESPACE_SAVE_TICKS.get();
             dirtyNamespaces.add(namespace);
             boolean stillSaved = savedAudios.values().stream().anyMatch((p) -> p.contains(id));
             if(!stillSaved) {
@@ -475,7 +479,7 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin, VoiceChatRecor
     }
 
     public void tick() {
-        if (--ticksToSaveNamespaces <= 0) {
+        if (!dirtyNamespaces.isEmpty() && --ticksToSaveNamespaces <= 0) {
             ticksToSaveNamespaces = RecordingCommonConfig.NAMESPACE_SAVE_TICKS.get();
             saveNamespaceFiles();
         }
