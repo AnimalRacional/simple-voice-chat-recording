@@ -1,4 +1,4 @@
-package dev.omialien.voicechatrecording;
+package dev.omialien.voicechatrecording.api;
 
 import java.util.UUID;
 
