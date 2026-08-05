@@ -51,72 +51,187 @@ public class NearestEntityPlayVoiceCommand {
                 Commands.argument("lfo-frequency", FloatArgumentType.floatArg()).executes(cmd)
         );
     }
+
+    private static LiteralArgumentBuilder<CommandSourceStack> REVERSE_ARG(Command<CommandSourceStack> cmd){
+        return Commands.literal("reverse").executes(cmd);
+    }
+
+    private static LiteralArgumentBuilder<CommandSourceStack> STUTTER_ARG(Command<CommandSourceStack> cmd){
+        return Commands.literal("stutter").then(
+                Commands.argument("chunk-seconds", FloatArgumentType.floatArg()).then(
+                        Commands.argument("repeats", IntegerArgumentType.integer()).executes(cmd)
+                )
+        );
+    }
+
+    private static LiteralArgumentBuilder<CommandSourceStack> HIGH_PASS_ARG(Command<CommandSourceStack> cmd){
+        return Commands.literal("high-pass").then(
+                Commands.argument("cutoff-hz", FloatArgumentType.floatArg()).executes(cmd)
+        );
+    }
+
+    private static LiteralArgumentBuilder<CommandSourceStack> ECHO_ARG(Command<CommandSourceStack> cmd){
+        return Commands.literal("echo").then(
+                Commands.argument("decay", FloatArgumentType.floatArg()).then(
+                        Commands.argument("delay-ms", IntegerArgumentType.integer()).then(
+                                Commands.argument("repeats", IntegerArgumentType.integer()).executes(cmd)
+                        ))
+        );
+    }
+
+    private static LiteralArgumentBuilder<CommandSourceStack> GLITCH_ARG(Command<CommandSourceStack> cmd){
+        return Commands.literal("glitch").then(
+                Commands.argument("start-chunk-seconds", FloatArgumentType.floatArg()).then(
+                        Commands.argument("min-chunk-seconds", FloatArgumentType.floatArg()).then(
+                                Commands.argument("stages", IntegerArgumentType.integer()).executes(cmd)
+                        ))
+        );
+    }
+
+    private static LiteralArgumentBuilder<CommandSourceStack> MULTI_PITCH_ARG(Command<CommandSourceStack> cmd){
+        return Commands.literal("multi-pitch").then(
+                Commands.argument("high-factor", FloatArgumentType.floatArg()).then(
+                        Commands.argument("low-factor", FloatArgumentType.floatArg()).executes(cmd)
+                )
+        );
+    }
+
     // TODO make this use savedAudios like the other commands
     // TODO add argument to use location instead of entity
     public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
         dispatcher.register(
                 Commands.literal("playVoice").requires((src) -> src.hasPermission(PERMISSION_LEVEL))
-                .then(CommandUtil.PLAYER_ARGUMENT.get().then(CommandUtil.AUDIO_ARGUMENT.get()
-                        .executes((ctx) ->{
-                            VoiceChatRecording.LOGGER.debug("id");
-                            return runCommand(ctx, null,
-                                    AudioId.of(UuidArgument.getUuid(ctx, "player"),
-                                            UuidArgument.getUuid(ctx, "audio")), null);
-                        })
-                        .then(Commands.argument("entity", EntityArgument.entities())
+                        .then(CommandUtil.PLAYER_ARGUMENT.get().then(CommandUtil.AUDIO_ARGUMENT.get()
                                 .executes((ctx) ->{
-                                    VoiceChatRecording.LOGGER.debug("ent id");
-                                    return runCommand(
-                                        ctx, EntityArgument.getEntities(ctx, "entity"),
-                                        AudioId.of(UuidArgument.getUuid(ctx, "player"),
-                                                UuidArgument.getUuid(ctx, "audio")), null);
+                                    VoiceChatRecording.LOGGER.debug("id");
+                                    return runCommand(ctx, null,
+                                            AudioId.of(UuidArgument.getUuid(ctx, "player"),
+                                                    UuidArgument.getUuid(ctx, "audio")), null);
                                 })
-                                .then(PITCH_ARG((ctx) -> {
-                                    VoiceChatRecording.LOGGER.debug("ent id pitch");
-                                    return runCommand(
-                                            ctx, EntityArgument.getEntities(ctx, "entity"),
-                                            AudioId.of(
-                                                    UuidArgument.getUuid(ctx, "player"),
-                                                    UuidArgument.getUuid(ctx, "audio")
-                                            ),
-                                            AudioEffect.pitch(FloatArgumentType.getFloat(ctx, "pitchFactor"))
-                                    );
-                                })).then(REVERB_ARG((ctx) -> {
-                                    VoiceChatRecording.LOGGER.debug("ent id reverb");
-                                    float decay = FloatArgumentType.getFloat(ctx, "decay");
-                                    int delay = IntegerArgumentType.getInteger(ctx, "delay-ms");
-                                    int repeats = IntegerArgumentType.getInteger(ctx, "repeats");
-                                    return runCommand(
-                                            ctx, EntityArgument.getEntities(ctx, "entity"),
-                                            AudioId.of(
-                                                    UuidArgument.getUuid(ctx, "player"),
-                                                    UuidArgument.getUuid(ctx, "audio")
-                                            ),
-                                            AudioEffect.reverb(decay, delay, repeats)
-                                    );
+                                .then(Commands.argument("entity", EntityArgument.entities())
+                                        .executes((ctx) ->{
+                                            VoiceChatRecording.LOGGER.debug("ent id");
+                                            return runCommand(
+                                                    ctx, EntityArgument.getEntities(ctx, "entity"),
+                                                    AudioId.of(UuidArgument.getUuid(ctx, "player"),
+                                                            UuidArgument.getUuid(ctx, "audio")), null);
                                         })
-                                ).then(ROBOT_ARG((ctx) -> {
-                                    VoiceChatRecording.LOGGER.debug("ent id robot");
-                                    return runCommand(
-                                            ctx, EntityArgument.getEntities(ctx, "entity"),
-                                            AudioId.of(
-                                                    UuidArgument.getUuid(ctx, "player"),
-                                                    UuidArgument.getUuid(ctx, "audio")
-                                            ),
-                                            AudioEffect.robot(FloatArgumentType.getFloat(ctx, "lfo-frequency"))
-                                    );
-                                }))
-                                .then(Commands.literal("random").executes((ctx) -> {
-                                    VoiceChatRecording.LOGGER.debug("ent id random");
-                                    return runCommand(
-                                            ctx, EntityArgument.getEntities(ctx, "entity"),
-                                            new AudioId(
-                                                    UuidArgument.getUuid(ctx, "player"),
-                                                    UuidArgument.getUuid(ctx, "audio")
-                                            ),
-                                            AudioEffect.random()
-                                    );
-                                }))))));
+                                        .then(PITCH_ARG((ctx) -> {
+                                            VoiceChatRecording.LOGGER.debug("ent id pitch");
+                                            return runCommand(
+                                                    ctx, EntityArgument.getEntities(ctx, "entity"),
+                                                    AudioId.of(
+                                                            UuidArgument.getUuid(ctx, "player"),
+                                                            UuidArgument.getUuid(ctx, "audio")
+                                                    ),
+                                                    AudioEffect.pitch(FloatArgumentType.getFloat(ctx, "pitchFactor"))
+                                            );
+                                        })).then(REVERB_ARG((ctx) -> {
+                                                    VoiceChatRecording.LOGGER.debug("ent id reverb");
+                                                    float decay = FloatArgumentType.getFloat(ctx, "decay");
+                                                    int delay = IntegerArgumentType.getInteger(ctx, "delay-ms");
+                                                    int repeats = IntegerArgumentType.getInteger(ctx, "repeats");
+                                                    return runCommand(
+                                                            ctx, EntityArgument.getEntities(ctx, "entity"),
+                                                            AudioId.of(
+                                                                    UuidArgument.getUuid(ctx, "player"),
+                                                                    UuidArgument.getUuid(ctx, "audio")
+                                                            ),
+                                                            AudioEffect.reverb(decay, delay, repeats)
+                                                    );
+                                                })
+                                        ).then(ROBOT_ARG((ctx) -> {
+                                            VoiceChatRecording.LOGGER.debug("ent id robot");
+                                            return runCommand(
+                                                    ctx, EntityArgument.getEntities(ctx, "entity"),
+                                                    AudioId.of(
+                                                            UuidArgument.getUuid(ctx, "player"),
+                                                            UuidArgument.getUuid(ctx, "audio")
+                                                    ),
+                                                    AudioEffect.robot(FloatArgumentType.getFloat(ctx, "lfo-frequency"))
+                                            );
+                                        })).then(REVERSE_ARG((ctx) -> {
+                                            VoiceChatRecording.LOGGER.debug("ent id reverse");
+                                            return runCommand(
+                                                    ctx, EntityArgument.getEntities(ctx, "entity"),
+                                                    AudioId.of(
+                                                            UuidArgument.getUuid(ctx, "player"),
+                                                            UuidArgument.getUuid(ctx, "audio")
+                                                    ),
+                                                    AudioEffect.reverse()
+                                            );
+                                        })).then(STUTTER_ARG((ctx) -> {
+                                            VoiceChatRecording.LOGGER.debug("ent id stutter");
+                                            float chunkSeconds = FloatArgumentType.getFloat(ctx, "chunk-seconds");
+                                            int repeats = IntegerArgumentType.getInteger(ctx, "repeats");
+                                            return runCommand(
+                                                    ctx, EntityArgument.getEntities(ctx, "entity"),
+                                                    AudioId.of(
+                                                            UuidArgument.getUuid(ctx, "player"),
+                                                            UuidArgument.getUuid(ctx, "audio")
+                                                    ),
+                                                    AudioEffect.stutter(chunkSeconds, repeats)
+                                            );
+                                        })).then(HIGH_PASS_ARG((ctx) -> {
+                                            VoiceChatRecording.LOGGER.debug("ent id high-pass");
+                                            return runCommand(
+                                                    ctx, EntityArgument.getEntities(ctx, "entity"),
+                                                    AudioId.of(
+                                                            UuidArgument.getUuid(ctx, "player"),
+                                                            UuidArgument.getUuid(ctx, "audio")
+                                                    ),
+                                                    AudioEffect.highPass(FloatArgumentType.getFloat(ctx, "cutoff-hz"))
+                                            );
+                                        })).then(ECHO_ARG((ctx) -> {
+                                            VoiceChatRecording.LOGGER.debug("ent id echo");
+                                            float decay = FloatArgumentType.getFloat(ctx, "decay");
+                                            int delay = IntegerArgumentType.getInteger(ctx, "delay-ms");
+                                            int repeats = IntegerArgumentType.getInteger(ctx, "repeats");
+                                            return runCommand(
+                                                    ctx, EntityArgument.getEntities(ctx, "entity"),
+                                                    AudioId.of(
+                                                            UuidArgument.getUuid(ctx, "player"),
+                                                            UuidArgument.getUuid(ctx, "audio")
+                                                    ),
+                                                    AudioEffect.echo(decay, delay, repeats)
+                                            );
+                                        })).then(GLITCH_ARG((ctx) -> {
+                                            VoiceChatRecording.LOGGER.debug("ent id glitch");
+                                            float startChunkSeconds = FloatArgumentType.getFloat(ctx, "start-chunk-seconds");
+                                            float minChunkSeconds = FloatArgumentType.getFloat(ctx, "min-chunk-seconds");
+                                            int stages = IntegerArgumentType.getInteger(ctx, "stages");
+                                            return runCommand(
+                                                    ctx, EntityArgument.getEntities(ctx, "entity"),
+                                                    AudioId.of(
+                                                            UuidArgument.getUuid(ctx, "player"),
+                                                            UuidArgument.getUuid(ctx, "audio")
+                                                    ),
+                                                    AudioEffect.glitch(startChunkSeconds, minChunkSeconds, stages)
+                                            );
+                                        })).then(MULTI_PITCH_ARG((ctx) -> {
+                                            VoiceChatRecording.LOGGER.debug("ent id multi-pitch");
+                                            float highFactor = FloatArgumentType.getFloat(ctx, "high-factor");
+                                            float lowFactor = FloatArgumentType.getFloat(ctx, "low-factor");
+                                            return runCommand(
+                                                    ctx, EntityArgument.getEntities(ctx, "entity"),
+                                                    AudioId.of(
+                                                            UuidArgument.getUuid(ctx, "player"),
+                                                            UuidArgument.getUuid(ctx, "audio")
+                                                    ),
+                                                    AudioEffect.multiPitch(highFactor, lowFactor)
+                                            );
+                                        }))
+                                        .then(Commands.literal("random").executes((ctx) -> {
+                                            VoiceChatRecording.LOGGER.debug("ent id random");
+                                            return runCommand(
+                                                    ctx, EntityArgument.getEntities(ctx, "entity"),
+                                                    new AudioId(
+                                                            UuidArgument.getUuid(ctx, "player"),
+                                                            UuidArgument.getUuid(ctx, "audio")
+                                                    ),
+                                                    AudioEffect.random()
+                                            );
+                                        }))))));
     }
 
     private static LivingEntity getNearestEntity(CommandContext<CommandSourceStack> ctx){
