@@ -260,7 +260,6 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin, VoiceChatRecor
                     if(!savedAudios.containsKey(namespace)) { savedAudios.put(namespace, ConcurrentHashMap.newKeySet()); }
                     for(AudioId id : audioIds){
                         savedAudios.get(namespace).add(id);
-                        VoiceChatRecording.LOGGER.debug("{}: {} {}", namespace, id.player(), id.second());
                     }
                 }
             }
@@ -290,19 +289,27 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin, VoiceChatRecor
 
     @Nullable
     private Future<IRecordedAudio> loadRawAudio(AudioId ids, AudioLoadedEvent.LoadType type, Consumer<IRecordedAudio> reaction, String namespace) {
-        VoiceChatRecording.LOGGER.debug("Checking cache...");
         try {
-            return audioCache.get(ids, () -> {
+            Future<IRecordedAudio> cached = audioCache.get(ids, () -> {
                 Path audioPath = RecordedAudio.audiosPath.resolve(RecordedAudio.getFileName(ids.player(), ids.audio()));
                 return audioLoader.submit(() -> {
                     IRecordedAudio res = this.readAudioFromFile(audioPath, ids);
                     MinecraftForge.EVENT_BUS.post(new AudioLoadedEvent(res, type, namespace));
-                    reaction.accept(res);
                     return res;
                 });
             });
+            audioLoader.submit(() -> {
+                try {
+                    reaction.accept(cached.get());
+                } catch (InterruptedException | ExecutionException e) {
+                    VoiceChatRecording.LOGGER.error("Error loading audio {}, {}", ids.player(), ids.audio());
+                    VoiceChatRecording.LOGGER.error("{}", e.getMessage());
+                }
+            });
+            return cached;
         } catch (ExecutionException e) {
-            VoiceChatRecording.LOGGER.error("There was an error loading the audio {}: {}", ids, e);
+            VoiceChatRecording.LOGGER.error("Error loading audio {}, {}", ids.player(), ids.audio());
+            VoiceChatRecording.LOGGER.error("{}", e.getMessage());
             return null;
         }
     }
