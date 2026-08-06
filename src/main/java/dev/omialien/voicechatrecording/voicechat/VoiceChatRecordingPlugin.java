@@ -19,6 +19,7 @@ import dev.omialien.voicechatrecording.api.events.MicPacketReceivedEvent;
 import dev.omialien.voicechatrecording.api.events.RecordingSetupEvent;
 import net.neoforged.neoforge.common.NeoForge;
 
+import javax.annotation.Nullable;
 import java.io.*;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -252,7 +253,6 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin, VoiceChatRecor
                     if(!savedAudios.containsKey(namespace)) { savedAudios.put(namespace, ConcurrentHashMap.newKeySet()); }
                     for(AudioId id : audioIds){
                         savedAudios.get(namespace).add(id);
-                        VoiceChatRecording.LOGGER.debug("{}: {} {}", namespace, id.player(), id.audio());
                     }
                 }
             }
@@ -279,32 +279,31 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin, VoiceChatRecor
         return new RecordedAudio(audio, ids.player(), ids.audio());
     }
 
+    @Nullable
     private Future<IRecordedAudio> loadRawAudio(AudioId ids, AudioLoadedEvent.LoadType type, Consumer<IRecordedAudio> reaction, String namespace) {
-        VoiceChatRecording.LOGGER.debug("Checking cache...");
-        Future<IRecordedAudio> cached = audioCache.getIfPresent(ids);
-        if (cached == null) {
-            VoiceChatRecording.LOGGER.debug("Not in cache, adding");
-            Path audioPath = RecordedAudio.audiosPath.resolve(RecordedAudio.getFileName(ids.player(), ids.audio()));
-            Future<IRecordedAudio> loading = audioLoader.submit(() -> {
-                IRecordedAudio res = this.readAudioFromFile(audioPath, ids);
-                NeoForge.EVENT_BUS.post(new AudioLoadedEvent(res, type, namespace));
-                reaction.accept(res);
-                return res;
+        try {
+            Future<IRecordedAudio> cached = audioCache.get(ids, () -> {
+                Path audioPath = RecordedAudio.audiosPath.resolve(RecordedAudio.getFileName(ids.player(), ids.audio()));
+                return audioLoader.submit(() -> {
+                    IRecordedAudio res = this.readAudioFromFile(audioPath, ids);
+                    NeoForge.EVENT_BUS.post(new AudioLoadedEvent(res, type, namespace));
+                    return res;
+                });
             });
-            audioCache.put(ids, loading);
-            return loading;
+            audioLoader.submit(() -> {
+                try {
+                    reaction.accept(cached.get());
+                } catch (InterruptedException | ExecutionException e) {
+                    VoiceChatRecording.LOGGER.error("Error loading audio {}, {}", ids.player(), ids.audio());
+                    VoiceChatRecording.LOGGER.error("{}", e.getMessage());
+                }
+            });
+            return cached;
+        } catch (ExecutionException e) {
+            VoiceChatRecording.LOGGER.error("Error loading audio {}, {}", ids.player(), ids.audio());
+            VoiceChatRecording.LOGGER.error("{}", e.getMessage());
+            return null;
         }
-        return audioLoader.submit(() -> {
-            try {
-                IRecordedAudio res = cached.get();
-                reaction.accept(res);
-                NeoForge.EVENT_BUS.post(new AudioLoadedEvent(res, type, namespace));
-                return res;
-            } catch (InterruptedException | ExecutionException e) {
-                VoiceChatRecording.LOGGER.error("Error getting cached audio: {}", e.getMessage());
-                return null;
-            }
-        });
     }
 
     private Future<IRecordedAudio> loadRawAudio(AudioId ids, AudioLoadedEvent.LoadType type, Consumer<IRecordedAudio> reaction){
