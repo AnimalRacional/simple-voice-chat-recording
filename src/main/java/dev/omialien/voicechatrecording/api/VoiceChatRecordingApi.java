@@ -1,5 +1,6 @@
 package dev.omialien.voicechatrecording.api;
 
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.Future;
@@ -17,4 +18,5 @@ public interface VoiceChatRecordingApi {
     IRecordedPlayer getRecordedPlayer(UUID uuid);
     boolean getPrivacy(UUID uuid);
     void unsaveAudio(String namespace, UUID playerUUID, UUID audioId);
+    Optional<IRecordedAudio> forceFinishRecording(UUID playerUUID);
 }

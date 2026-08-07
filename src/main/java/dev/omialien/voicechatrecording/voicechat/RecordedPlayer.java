@@ -2,11 +2,13 @@ package dev.omialien.voicechatrecording.voicechat;
 
 import de.maxhenkel.voicechat.api.opus.OpusDecoder;
 import dev.omialien.voicechatrecording.VoiceChatRecording;
+import dev.omialien.voicechatrecording.api.IRecordedAudio;
 import dev.omialien.voicechatrecording.configs.RecordingCommonConfig;
 import dev.omialien.voicechatrecording.api.events.AudioRecordedEvent;
 import dev.omialien.voicechatrecording.api.IRecordedPlayer;
 import net.neoforged.neoforge.common.NeoForge;
 
+import java.util.Optional;
 import java.util.UUID;
 
 public class RecordedPlayer implements IRecordedPlayer {
@@ -27,7 +29,12 @@ public class RecordedPlayer implements IRecordedPlayer {
         VoiceChatRecording.LOGGER.debug("Created RecordedPlayer {}", uuid);
     }
 
-    public void saveCurrentRecording() {
+    @Override
+    public Optional<IRecordedAudio> forceFinishRecording() {
+        return this.saveCurrentRecording();
+    }
+
+    public Optional<IRecordedAudio> saveCurrentRecording() {
         if (isRecording){
             short[] savedRecording = new short[recordingSize];
             System.arraycopy(recording, 0, savedRecording, 0, recordingSize);
@@ -35,7 +42,9 @@ public class RecordedPlayer implements IRecordedPlayer {
             NeoForge.EVENT_BUS.post(new AudioRecordedEvent(recAudio));
             currentRecordingIndex = 0;
             recordingSize = 0;
+            return Optional.of(recAudio);
         }
+        return Optional.empty();
     }
 
     public void recordPacket(byte[] packet) {
