@@ -52,9 +52,10 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin, VoiceChatRecor
         return VoiceChatRecording.MOD_ID;
     }
 
-    public void shutdownSaving() throws InterruptedException {
+    public void shutdownAudioSaving() throws InterruptedException {
         long start = System.nanoTime();
         VoiceChatRecording.LOGGER.info("Shutting down audio saving");
+        saveNamespaceFiles();
         audioSaver.shutdown();
         try {
             if (!audioSaver.awaitTermination(20, TimeUnit.SECONDS)) {
@@ -63,7 +64,6 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin, VoiceChatRecor
         } catch (InterruptedException e) {
             VoiceChatRecording.LOGGER.error("Audio saving was unexpectedly interrupted: {}", e.getMessage());
         }
-        saveNamespaceFiles();
         long elapsed = System.nanoTime() - start;
         VoiceChatRecording.LOGGER.info("Shut down audio saving in {}ms", TimeUnit.MILLISECONDS.convert(elapsed, TimeUnit.NANOSECONDS));
     }
