@@ -35,7 +35,7 @@ public class CommonEventBus {
             try {
                 Files.createDirectory(RecordedAudio.audiosPath);
             } catch (IOException e) {
-                VoiceChatRecording.LOGGER.error("Error creating audios directory: {}", e.getMessage());
+                VoiceChatRecording.LOGGER.error("Error creating audios directory", e);
             }
         }
     }
@@ -55,7 +55,7 @@ public class CommonEventBus {
             ((VoiceChatRecordingPlugin)VoiceChatRecording.recordingApi).shutdownAudioSaving();
             ((VoiceChatRecordingPlugin)VoiceChatRecording.recordingApi).shutdownAudioLoading();
         } catch(InterruptedException e){
-            VoiceChatRecording.LOGGER.error("Audio saving shutdown interrupted! {}\n{}", e.getMessage(), e.getStackTrace());
+            VoiceChatRecording.LOGGER.error("Audio saving shutdown interrupted!", e);
         }
     }
     @SubscribeEvent
@@ -92,13 +92,17 @@ public class CommonEventBus {
     @SubscribeEvent
     public static void onLoadedAudio(AudioLoadedEvent event){
         if (event.getAudio() == null) { return; }
-        VoiceChatRecording.LOGGER.debug("EVENT: Audio loaded! {} {} {}", event.getAudio().getFilterResult(), event.getAudio().getPlayerUUID(), event.getAudio().getId());
+        if (VoiceChatRecording.LOGGER.isDebugEnabled()) {
+            VoiceChatRecording.LOGGER.debug("EVENT: Audio loaded! {} {} {}", event.getAudio().getFilterResult(), event.getAudio().getPlayerUUID(), event.getAudio().getId());
+        }
     }
 
     @SubscribeEvent
     public static void onGenericAudio(AudioEvent event){
         if (event.getAudio() == null) { return; }
-        VoiceChatRecording.LOGGER.debug("GENERIC EVENT: audio {} {} {}", event.getAudio().getFilterResult().toString(), event.getAudio().getPlayerUUID(), event.getAudio().getId());
+        if (VoiceChatRecording.LOGGER.isDebugEnabled()) {
+            VoiceChatRecording.LOGGER.debug("GENERIC EVENT: audio {} {} {}", event.getAudio().getFilterResult().toString(), event.getAudio().getPlayerUUID(), event.getAudio().getId());
+        }
         if(RememberAudiosCommand.shouldRemember) {
             IRecordedAudio.FilterResult filter = event.getAudio().getFilterResult();
             if((filter == IRecordedAudio.FilterResult.PASSED || filter == IRecordedAudio.FilterResult.TOO_LONG)) {

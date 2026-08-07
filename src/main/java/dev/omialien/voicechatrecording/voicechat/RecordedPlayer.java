@@ -69,7 +69,7 @@ public class RecordedPlayer implements IRecordedPlayer {
                     saveCurrentRecording();
                 }
             } catch (Exception e) {
-                VoiceChatRecording.LOGGER.error("Error decoding packet: {}", e.getMessage());
+                VoiceChatRecording.LOGGER.error("Error decoding packet:", e);
             }
         }
     }

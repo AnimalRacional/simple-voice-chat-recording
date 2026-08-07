@@ -24,10 +24,7 @@ import java.io.*;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.channels.FileChannel;
-import java.nio.file.DirectoryStream;
-import java.nio.file.FileAlreadyExistsException;
-import java.nio.file.Files;
-import java.nio.file.Path;
+import java.nio.file.*;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.function.Consumer;
@@ -62,7 +59,7 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin, VoiceChatRecor
                 VoiceChatRecording.LOGGER.error("Shutting down audio saving took too long! Data may be lost");
             }
         } catch (InterruptedException e) {
-            VoiceChatRecording.LOGGER.error("Audio saving was unexpectedly interrupted: {}", e.getMessage());
+            VoiceChatRecording.LOGGER.error("Audio saving was unexpectedly interrupted:", e);
         }
         long elapsed = System.nanoTime() - start;
         VoiceChatRecording.LOGGER.info("Shut down audio saving in {}ms", TimeUnit.MILLISECONDS.convert(elapsed, TimeUnit.NANOSECONDS));
@@ -169,8 +166,7 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin, VoiceChatRecor
             writer.close();
             VoiceChatRecording.LOGGER.debug("Wrote namespace file {}.json with {} audios", namespace, audios.size());
         } catch (IOException e) {
-            VoiceChatRecording.LOGGER.error("Couldn't save json file for namespace {}!", namespace);
-            VoiceChatRecording.LOGGER.error("{}", e.getMessage());
+            VoiceChatRecording.LOGGER.error("Couldn't save json file for namespace {}!", namespace, e);
         }
     }
 
@@ -268,12 +264,11 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin, VoiceChatRecor
             short[] shrts = new short[byts.length / 2];
             ByteBuffer.wrap(byts).order(ByteOrder.BIG_ENDIAN).asShortBuffer().get(shrts);
             audio = shrts;
-        }  catch (FileNotFoundException e) {
-            VoiceChatRecording.LOGGER.error("Tried to load non-existent audio {}", audioPath);
+        }  catch (FileNotFoundException | NoSuchFileException e) {
+            VoiceChatRecording.LOGGER.error("Tried to load non-existent audio file {}", audioPath);
             return null;
         } catch (IOException e) {
-            VoiceChatRecording.LOGGER.error("Error loading audio: {}", audioPath);
-            VoiceChatRecording.LOGGER.error("{}", e.getMessage());
+            VoiceChatRecording.LOGGER.error("Error loading audio: {}", audioPath, e);
             return null;
         }
         return new RecordedAudio(audio, ids.player(), ids.audio());

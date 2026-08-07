@@ -163,7 +163,7 @@ public class NearestEntityPlayVoiceCommand {
             }
             return 0;
         } catch(Exception e){
-            VoiceChatRecording.LOGGER.error("Error running playVoice: {}\r\n{}", e.getMessage(), e.getStackTrace());
+            VoiceChatRecording.LOGGER.error("Error running playVoice:", e);
             ctx.getSource().sendFailure(Component.literal(e.getMessage()));
             return 100;
         }
