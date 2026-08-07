@@ -48,7 +48,7 @@ public class CommonEventBus {
             VoiceChatRecording.LOGGER.info("Shutting down audio saving...");
             RememberAudiosCommand.shouldRemember = false;
             VoiceChatRecording.storedAudios.clear();
-            ((VoiceChatRecordingPlugin)VoiceChatRecording.recordingApi).shutdownSaving();
+            ((VoiceChatRecordingPlugin)VoiceChatRecording.recordingApi).shutdownAudioSaving();
             ((VoiceChatRecordingPlugin)VoiceChatRecording.recordingApi).shutdownAudioLoading();
         } catch(InterruptedException e){
             VoiceChatRecording.LOGGER.error("Audio saving shutdown interrupted! {}\n{}", e.getMessage(), e.getStackTrace());
@@ -79,11 +79,13 @@ public class CommonEventBus {
 
     @SubscribeEvent
     public static void onLoadedAudio(AudioLoadedEvent event){
+        if (event.getAudio() == null) { return; }
         VoiceChatRecording.LOGGER.debug("EVENT: Audio loaded! {} {} {}", event.getAudio().getFilterResult(), event.getAudio().getPlayerUUID(), event.getAudio().getId());
     }
 
     @SubscribeEvent
     public static void onGenericAudio(AudioEvent event){
+        if (event.getAudio() == null) { return; }
         VoiceChatRecording.LOGGER.debug("GENERIC EVENT: audio {} {} {}", event.getAudio().getFilterResult().toString(), event.getAudio().getPlayerUUID(), event.getAudio().getId());
         if(RememberAudiosCommand.shouldRemember) {
             IRecordedAudio.FilterResult filter = event.getAudio().getFilterResult();
