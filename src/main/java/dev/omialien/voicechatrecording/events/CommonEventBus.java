@@ -60,7 +60,7 @@ public class CommonEventBus {
     }
     @SubscribeEvent
     public static void onRegisterCommands(RegisterCommandsEvent event) {
-        NearestEntityPlayVoiceCommand.register(event.getDispatcher());
+        PlayVoiceCommand.register(event.getDispatcher());
         StartRecordingCommand.register(event.getDispatcher());
         StopRecordingCommand.register(event.getDispatcher());
         IsRecordingCommand.register(event.getDispatcher());
