@@ -31,7 +31,7 @@ public class CommonEventBus {
             try {
                 Files.createDirectory(RecordedAudio.audiosPath);
             } catch (IOException e) {
-                VoiceChatRecording.LOGGER.error("Error creating audios directory: {}", e.getMessage());
+                VoiceChatRecording.LOGGER.error("Error creating audios directory", e);
             }
         }
     }
@@ -51,7 +51,7 @@ public class CommonEventBus {
             ((VoiceChatRecordingPlugin)VoiceChatRecording.recordingApi).shutdownAudioSaving();
             ((VoiceChatRecordingPlugin)VoiceChatRecording.recordingApi).shutdownAudioLoading();
         } catch(InterruptedException e){
-            VoiceChatRecording.LOGGER.error("Audio saving shutdown interrupted! {}\n{}", e.getMessage(), e.getStackTrace());
+            VoiceChatRecording.LOGGER.error("Audio saving shutdown interrupted!", e);
         }
     }
     @SubscribeEvent

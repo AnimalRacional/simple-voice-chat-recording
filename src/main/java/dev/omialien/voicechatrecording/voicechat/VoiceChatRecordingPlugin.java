@@ -61,7 +61,7 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin, VoiceChatRecor
                 VoiceChatRecording.LOGGER.error("Shutting down audio saving took too long! Data may be lost");
             }
         } catch (InterruptedException e) {
-            VoiceChatRecording.LOGGER.error("Audio saving was unexpectedly interrupted: {}", e.getMessage());
+            VoiceChatRecording.LOGGER.error("Audio saving was unexpectedly interrupted:", e);
         }
         long elapsed = System.nanoTime() - start;
         VoiceChatRecording.LOGGER.info("Shut down audio saving in {}ms", TimeUnit.MILLISECONDS.convert(elapsed, TimeUnit.NANOSECONDS));
@@ -171,8 +171,7 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin, VoiceChatRecor
             writer.close();
             VoiceChatRecording.LOGGER.debug("Wrote namespace file {}.json with {} audios", namespace, audios.size());
         } catch (IOException e) {
-            VoiceChatRecording.LOGGER.error("Couldn't save json file for namespace {}!", namespace);
-            VoiceChatRecording.LOGGER.error("{}", e.getMessage());
+            VoiceChatRecording.LOGGER.error("Couldn't save json file for namespace {}!", namespace, e);
         }
     }
 
@@ -277,12 +276,10 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin, VoiceChatRecor
             VoiceChatRecording.LOGGER.error("Tried to load non-existent audio {}", audioPath);
             return null;
         } catch (IOException e) {
-            VoiceChatRecording.LOGGER.error("Error loading audio: {}", audioPath);
-            VoiceChatRecording.LOGGER.error("{}", e.getMessage());
+            VoiceChatRecording.LOGGER.error("Error loading audio: {}", audioPath, e);
             return null;
         }
-        IRecordedAudio audioObj = new RecordedAudio(audio, ids.first(), ids.second());
-        return audioObj;
+        return new RecordedAudio(audio, ids.first(), ids.second());
     }
 
     @Nullable
@@ -300,14 +297,12 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin, VoiceChatRecor
                 try {
                     reaction.accept(cached.get());
                 } catch (InterruptedException | ExecutionException e) {
-                    VoiceChatRecording.LOGGER.error("Error loading audio {}, {}", ids.player(), ids.audio());
-                    VoiceChatRecording.LOGGER.error("{}", e.getMessage());
+                    VoiceChatRecording.LOGGER.error("Error loading audio {}, {}", ids.player(), ids.audio(), e);
                 }
             });
             return cached;
         } catch (ExecutionException e) {
-            VoiceChatRecording.LOGGER.error("Error loading audio {}, {}", ids.player(), ids.audio());
-            VoiceChatRecording.LOGGER.error("{}", e.getMessage());
+            VoiceChatRecording.LOGGER.error("Error loading audio {}, {}", ids.player(), ids.audio(), e);
             return null;
         }
     }

@@ -15,13 +15,8 @@ import net.minecraft.commands.Commands;
 import net.minecraft.commands.arguments.EntityArgument;
 import net.minecraft.commands.arguments.UuidArgument;
 import net.minecraft.network.chat.Component;
-import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.world.entity.ai.targeting.TargetingConditions;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.phys.AABB;
-import net.minecraft.world.phys.Vec3;
 
 import javax.annotation.Nullable;
 import java.util.Collection;
@@ -30,9 +25,6 @@ import java.util.List;
 public class NearestEntityPlayVoiceCommand {
     public static final int PERMISSION_LEVEL = 2;
     private static final float CHANNEL_DISTANCE = 20;
-    public static final int bbX = 5;
-    public static final int bbY = 5;
-    public static final int bbZ = 5;
 
     private static LiteralArgumentBuilder<CommandSourceStack> PITCH_ARG(Command<CommandSourceStack> cmd){
         return Commands.literal("pitch").then(Commands.argument("pitchFactor", FloatArgumentType.floatArg()).executes(cmd));
@@ -269,7 +261,7 @@ public class NearestEntityPlayVoiceCommand {
             }
             return 0;
         } catch(Exception e){
-            VoiceChatRecording.LOGGER.error("Error running playVoice: {}\r\n{}", e.getMessage(), e.getStackTrace());
+            VoiceChatRecording.LOGGER.error("Error running playVoice:", e);
             ctx.getSource().sendFailure(Component.literal(e.getMessage()));
             return 100;
         }
