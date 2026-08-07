@@ -22,7 +22,7 @@ import javax.annotation.Nullable;
 import java.util.Collection;
 import java.util.List;
 
-public class NearestEntityPlayVoiceCommand {
+public class PlayVoiceCommand {
     public static final int PERMISSION_LEVEL = 2;
     private static final float CHANNEL_DISTANCE = 20;
 
