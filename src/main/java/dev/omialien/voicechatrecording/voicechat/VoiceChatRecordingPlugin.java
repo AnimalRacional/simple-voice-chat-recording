@@ -484,4 +484,9 @@ public class VoiceChatRecordingPlugin implements VoicechatPlugin, VoiceChatRecor
             saveNamespaceFiles();
         }
     }
+
+    @Override
+    public Optional<IRecordedAudio> forceFinishRecording(UUID uuid) {
+        return Optional.ofNullable(recordedPlayers.get(uuid)).flatMap(RecordedPlayer::saveCurrentRecording);
+    }
 }
