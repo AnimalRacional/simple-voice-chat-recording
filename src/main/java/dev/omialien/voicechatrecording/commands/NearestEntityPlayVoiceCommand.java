@@ -24,8 +24,8 @@ import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 
 import javax.annotation.Nullable;
-import java.util.ArrayList;
 import java.util.Collection;
+import java.util.List;
 
 public class NearestEntityPlayVoiceCommand {
     public static final int PERMISSION_LEVEL = 2;
@@ -234,15 +234,6 @@ public class NearestEntityPlayVoiceCommand {
                                         }))))));
     }
 
-    private static LivingEntity getNearestEntity(CommandContext<CommandSourceStack> ctx){
-        ServerLevel level = ctx.getSource().getLevel();
-        Vec3 srcPos = ctx.getSource().getPosition();
-        AABB aabb = new AABB(srcPos.x + bbX, srcPos.y + bbY, srcPos.z + bbZ,
-                srcPos.x - bbX, srcPos.y - bbY, srcPos.z - bbZ);
-        return level.getNearestEntity(LivingEntity.class, TargetingConditions.DEFAULT,
-                null, srcPos.x, srcPos.y, srcPos.z, aabb);
-    }
-
     private static void playAudio(CommandContext<CommandSourceStack> ctx,
                                   Entity entity, AudioId id,
                                   AudioEffect effects){
@@ -266,13 +257,12 @@ public class NearestEntityPlayVoiceCommand {
         try{
             Collection<Entity> entities = targets == null ? null : targets.stream().map((e) -> (Entity)e).toList();
             if(entities == null){
-                // If no entities are specified, use the nearest entity
-                LivingEntity nearestEntity = getNearestEntity(ctx);
-                if(nearestEntity == null){
-                    ctx.getSource().sendFailure(Component.literal("No entity found!"));
-                    return 20;
+                Entity self = ctx.getSource().getEntity();
+                if (self == null) {
+                    ctx.getSource().sendFailure(Component.literal("Only entities may use this command without specifying an entity to play on"));
+                    return 10;
                 }
-                entities = new ArrayList<>(); entities.add(nearestEntity);
+                entities = List.of(self);
             }
             for(Entity audioTarget : entities){
                 playAudio(ctx, audioTarget, id, effects);
